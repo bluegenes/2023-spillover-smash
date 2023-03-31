@@ -16,11 +16,16 @@ ACCESSIONS = {'genbank': gb_acc, 'refseq': rf_acc}
 all_accessions = gb_acc + rf_acc
 
 databases= ['genbank', 'refseq']
+db_accs = []
+for db in databases:
+    accs = expand("{db}/{acc}", db=db, acc=ACCESSIONS[db])
+    db_accs +=accs
+
 
 rule all:
     input: 
-        genomes=expand("{db}/{acc}.fna", db=databases, acc= all_accessions),
-        proteomes=expand("{db}/{acc}.faa", db=databases,acc= all_accessions),
+        genomes=expand("{dbacc}.fna", dbacc=db_accs),
+        #proteomes=lambda w: expand("{db}/{acc}.faa", db=databases,acc= ACCESSIONS[w.db]),
         #"{db}.dna-sc1.zip",
         #"{db}.protein-sc1.zip"
 
@@ -28,7 +33,8 @@ rule all:
 rule download_dna:
     output: "{db}/{acc}.fna"
     params:
-        url = lambda w: "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nucleotide&id={w.acc}&rettype=fasta&retmode=text",
+        url = lambda w: "https://www.ncbi.nlm.nih.gov/sviewer/viewer.cgi?db=nuccore&report=fasta&id={w.acc}&extrafeat=null&conwithfeat=on&&retmode=html&tool=portal&withmarkup=on&&maxdownloadsize=1000000"
+        #url = lambda w: "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nucleotide&id={w.acc}&rettype=fasta&retmode=text",
     log: os.path.join(logs_dir, "downloads", "{db}/{acc}.dna.log")
     benchmark: os.path.join(logs_dir, "downloads", "{db}/{acc}.dna.benchmark")
     threads: 1
@@ -39,7 +45,7 @@ rule download_dna:
         partition="bml",#low2
     shell:
         """
-        curl {params.url} -o {output} 2> {log}
+        curl -o {output} -L {params.url} 2> {log}
         """
 
 rule download_protein:
