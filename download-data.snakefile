@@ -24,8 +24,8 @@ for db in databases:
 
 rule all:
     input: 
-        genomes=expand("{dbacc}.fna", dbacc=db_accs),
-        #proteomes=lambda w: expand("{db}/{acc}.faa", db=databases,acc= ACCESSIONS[w.db]),
+        #genomes=expand("{dbacc}.fna", dbacc=db_accs),
+        proteomes=expand("{dbacc}.faa", dbacc=db_accs),
         #"{db}.dna-sc1.zip",
         #"{db}.protein-sc1.zip"
 
@@ -34,7 +34,6 @@ rule download_dna:
     output: "{db}/{acc}.fna"
     params:
         url = lambda w: "https://www.ncbi.nlm.nih.gov/sviewer/viewer.cgi?db=nuccore&report=fasta&id={w.acc}&extrafeat=null&conwithfeat=on&&retmode=html&tool=portal&withmarkup=on&&maxdownloadsize=1000000"
-        #url = lambda w: "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nucleotide&id={w.acc}&rettype=fasta&retmode=text",
     log: os.path.join(logs_dir, "downloads", "{db}/{acc}.dna.log")
     benchmark: os.path.join(logs_dir, "downloads", "{db}/{acc}.dna.benchmark")
     threads: 1
@@ -51,7 +50,7 @@ rule download_dna:
 rule download_protein:
     output: "{db}/{acc}.faa"
     params:
-        url = lambda w: "curl https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=protein&id={w.acc}&rettype=fasta&retmode=text"
+        url = lambda w: "https://www.ncbi.nlm.nih.gov/sviewer/viewer.cgi?db=protein&report=fasta&id={w.acc}&extrafeat=null&conwithfeat=on&&retmode=html&tool=portal&withmarkup=on&&maxdownloadsize=1000000"
     log: os.path.join(logs_dir, "downloads", "{db}/{acc}.protein.log")
     benchmark: os.path.join(logs_dir, "downloads", "{db}/{acc}.protein.benchmark")
     threads: 1
@@ -62,7 +61,7 @@ rule download_protein:
         partition="low2",
     shell:
         """
-        curl {params.url} -o {output} 2> {log}
+        curl -o {output} -L {params.url} 2> {log}
         """
 
 
