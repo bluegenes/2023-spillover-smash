@@ -50,7 +50,9 @@ rule download_dna:
 rule download_protein:
     output: "{db}/{acc}.faa"
     params:
-        url = lambda w: "https://www.ncbi.nlm.nih.gov/sviewer/viewer.cgi?db=protein&report=fasta&id={w.acc}&extrafeat=null&conwithfeat=on&&retmode=html&tool=portal&withmarkup=on&&maxdownloadsize=1000000"
+        url = lambda w: "curl -o MK064563.fasta "https://www.ncbi.nlm.nih.gov/sviewer/viewer.fcgi?db=nuccore&report=fasta&id=MK064563&extrafeat=null&fmt_mask=0&retmode=html&withmarkup=on&tool=portal&log$=seqview&maxdownloadsize=1000000"
+"
+        #url = lambda w: "https://www.ncbi.nlm.nih.gov/sviewer/viewer.cgi?db=protein&report=fasta&id={w.acc}&extrafeat=null&conwithfeat=on&&retmode=html&tool=portal&withmarkup=on&&maxdownloadsize=1000000"
     log: os.path.join(logs_dir, "downloads", "{db}/{acc}.protein.log")
     benchmark: os.path.join(logs_dir, "downloads", "{db}/{acc}.protein.benchmark")
     threads: 1
