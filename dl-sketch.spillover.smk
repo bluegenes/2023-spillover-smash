@@ -8,7 +8,9 @@ sp_file = 'inputs/2023-03-27_spillover_accession-numers.csv'
 
 vmr = pd.read_csv(sp_file)
 
-ACCESSIONS = sp['AccessionNumber'].tolist()
+#ACCESSIONS = sp['AccessionNumber'].tolist()
+#ACCESSIONS = [a for a in ACCESSIONS if a]
+ACCESSIONS = [a for a in sp['AccessionNumber'] if a] # don't keep "" entries
 
 rule all:
     input: 
@@ -17,11 +19,11 @@ rule all:
 
 rule download_spillover_accession:
     output: 
-        nucl="spillover/genomic/{acc}.fna.gz",
-        prot="spillover/protein/{acc}.faa.gz",
-        fileinfo="spillover/{acc}.fileinfo.csv",
-    log: os.path.join(logs_dir, "downloads", "spillover/{acc}.log")
-    benchmark: os.path.join(logs_dir, "downloads", "spillover/{acc}.benchmark")
+        nucl="{basename}/genomic/{acc}.fna.gz",
+        prot="{basename}/protein/{acc}.faa.gz",
+        fileinfo="{basename}/{acc}.fileinfo.csv",
+    log: os.path.join(logs_dir, "downloads", "{basename}/{acc}.log")
+    benchmark: os.path.join(logs_dir, "downloads", "{basename}/{acc}.benchmark")
     threads: 1
     resources:
         mem_mb=3000,
@@ -35,9 +37,9 @@ rule download_spillover_accession:
 
 rule aggregate_fileinfo_to_fromfile:
     input: 
-        fileinfo=expand("spillover/{acc}.fileinfo.csv", acc=ACCESSIONS)
+        fileinfo=expand("{basename}/{acc}.fileinfo.csv", acc=ACCESSIONS, basename="spillover")
     output:
-        csv = os.path.join(out_dir, "spillover.fromfile.csv")
+        csv = os.path.join(out_dir, "{basename}.fromfile.csv")
     run:
         with open(str(output.csv), "w") as outF:
             header = 'name,genome_filename,protein_filename'
@@ -47,11 +49,11 @@ rule aggregate_fileinfo_to_fromfile:
                     outfile.write(inF.read())
 
 rule sketch_fromfile_dna:
-    input: os.path.join(out_dir, "spillover.fromfile.csv")
-    output: os.path.join(out_dir, "spillover.dna.zip")
+    input: os.path.join(out_dir, "{basename}.fromfile.csv")
+    output: os.path.join(out_dir, "{basename}.dna.zip")
     conda: "conf/env/sourmash.yml"
-    log:  os.path.join(logs_dir, "sketch", "spillover.log")
-    benchmark:  os.path.join(logs_dir, "sketch", "spillover.benchmark")
+    log:  os.path.join(logs_dir, "sketch", "{basename}.log")
+    benchmark:  os.path.join(logs_dir, "sketch", "{basename}.benchmark")
     threads: 1
     resources:
         mem_mb=3000,
@@ -64,11 +66,11 @@ rule sketch_fromfile_dna:
         """
 
 rule sketch_fromfile_protein:
-    input: os.path.join(out_dir, "spillover.fromfile.csv")
-    output: os.path.join(out_dir, "spillover.protein.zip")
+    input: os.path.join(out_dir, "{basename}.fromfile.csv")
+    output: os.path.join(out_dir, "{basename}.protein.zip")
     conda: "conf/env/sourmash.yml"
-    log:  os.path.join(logs_dir, "sketch", "spillover.log")
-    benchmark:  os.path.join(logs_dir, "sketch", "spillover.benchmark")
+    log:  os.path.join(logs_dir, "sketch", "{basename}.log")
+    benchmark:  os.path.join(logs_dir, "sketch", "{basename}.benchmark")
     threads: 1
     resources:
         mem_mb=3000,
