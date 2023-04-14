@@ -38,7 +38,8 @@ def extract_accs(ids):
             acc_only = acc_only.strip()
             split_ids.append(acc_only)
         else:
-            return ids
+            id = id.strip()
+            split_ids.append(id)
     return split_ids
 
 def find_assembly_accessions(row):
@@ -79,12 +80,14 @@ def find_assembly_accessions(row):
         for refseq_id in refseq_ids[1:]:
             if "(" not in refseq_id and ")" not in refseq_id:
                 if retrieve_assembly_accession(refseq_id) != refseq_assembly_id:
-                    raise ValueError("Multiple RefSeq accessions correspond to different assembly IDs.")
+                    refseq_assembly_id = ""
+                    #raise ValueError("Multiple RefSeq accessions correspond to different assembly IDs.")
     if len(genbank_ids) > 1:
         for genbank_id in genbank_ids[1:]:
             if "(" not in genbank_id and ")" not in genbank_id:
                 if retrieve_assembly_accession(genbank_id) != genbank_assembly_id:
-                    raise ValueError("Multiple GenBank accessions correspond to different assembly IDs.")
+                    genbank_assembly_id = ""
+                    #raise ValueError("Multiple GenBank accessions correspond to different assembly IDs.")
     # Add the assembly IDs to the row
     row["RefSeq Assembly ID"] = refseq_assembly_id
     row["GenBank Assembly ID"] = genbank_assembly_id
