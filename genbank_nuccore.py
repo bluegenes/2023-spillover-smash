@@ -25,11 +25,13 @@ def main(args):
         None
     """
     accession = args.accession
+
     # Use Entrez to download the record
     handle = Entrez.efetch(db="nucleotide", id=accession, rettype="gb", retmode="text")
 
-    # Use SeqIO to parse the record and extract the sequences
+    # Use SeqIO to parse the record and extract the organism name and sequences
     record = SeqIO.read(handle, "genbank")
+    organism_name = record.annotations["organism"]
     nucleotide_sequence = str(record.seq)
     protein_sequences = []
     for feature in record.features:
@@ -56,12 +58,13 @@ def main(args):
                 f.write(f">{accession}_CDS{i+1}|{locus_tag}\n{protein_sequence}\n")
     
     # Output file details on to a CSV file
+    name = accession + ' ' + organism_name
     with open(fileinfo_file, "w", newline='') as csvfile:
         writer = csv.writer(csvfile)
         if protein_exists:
-            writer.writerow([accession, nucleotide_file, protein_file])
+            writer.writerow([name, nucleotide_file, protein_file])
         else:
-            writer.writerow([accession, nucleotide_file,""])
+            writer.writerow([name, nucleotide_file,""])
             
 
 

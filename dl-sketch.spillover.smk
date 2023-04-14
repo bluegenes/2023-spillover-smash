@@ -4,11 +4,11 @@ import csv
 out_dir = "output.vmr"
 logs_dir = os.path.join(out_dir, 'logs')
 
-vmr_file = 'inputs/VMR_21-221122_MSL37.csv'
+sp_file = 'inputs/2023-03-27_spillover_accession-numers.csv'
 
-rf = pd.read_csv(vmr_file)
+vmr = pd.read_csv(sp_file)
 
-ACCESSIONS = gb['GenBank Assembly ID'].tolist()
+ACCESSIONS = sp['AccessionNumber'].tolist()
 
 rule all:
     input: 
@@ -40,7 +40,7 @@ rule aggregate_fileinfo_to_fromfile:
         csv = os.path.join(out_dir, "spillover.fromfile.csv")
     run:
         with open(str(output.csv), "w") as outF:
-            header = 'ident,genome_filename,protein_filename'
+            header = 'name,genome_filename,protein_filename'
             outF.write(','.join(header) + '\n')
             for inp in input:
                 with open(str(inp)) as inF:
