@@ -2,11 +2,12 @@ import pandas as pd
 import csv
 import numpy as np
 
-out_dir = "output.vmr"
+out_dir = "output.sp"
 logs_dir = os.path.join(out_dir, 'logs')
 basename="spillover"
 
-sp_file = 'inputs/2023-03-27_spillover_accession-numers.csv'
+#sp_file = 'inputs/2023-03-27_spillover_accession-numers.csv'
+sp_file = 'inputs/2023-03-27_spillover_accession-numers.head100.csv'
 
 sp = pd.read_csv(sp_file)
 
@@ -52,6 +53,7 @@ rule download_spillover_accession:
         nucl="{basename}/genomic/{acc}.fna.gz",
         prot="{basename}/protein/{acc}.faa.gz",
         fileinfo="{basename}/{acc}.fileinfo.csv",
+    conda: "conf/env/biopython.yml"
     log: os.path.join(logs_dir, "downloads", "{basename}/{acc}.log")
     benchmark: os.path.join(logs_dir, "downloads", "{basename}/{acc}.benchmark")
     threads: 1

@@ -1,3 +1,5 @@
 inputs/*
+output.*/*
+genbank/*
 outputs/*
 .DS_Store
