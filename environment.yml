@@ -7,4 +7,3 @@ dependencies:
   - python=3.10
   - snakemake=7.25.0
   - pandas>=1.5.3
-  - openpyxl
