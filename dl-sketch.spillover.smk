@@ -41,7 +41,6 @@ class Checkpoint_MakePattern:
         fastas = self.get_filenames(**w)
 
         pattern = expand(self.pattern, fn =fastas,**w)
-        print(pattern)
         return pattern
 
 rule all:
@@ -87,8 +86,8 @@ checkpoint check_fromfile:
 paramD = {"dna": "dna,k=21,scaled=1,abund", "protein": "protein,k=10,scaled=1,abund"}
 rule sketch_fromfile:
     input: 
-        os.path.join(out_dir, "{basename}.fromfile.csv"),
-        Checkpoint_MakePattern("{fn}"),
+        fromfile=os.path.join(out_dir, "{basename}.fromfile.csv"),
+        fastas=ancient(Checkpoint_MakePattern("{fn}")),
     output: os.path.join(out_dir, "{basename}.{moltype}.zip")
     params:
         lambda w: paramD[w.moltype]
@@ -103,5 +102,5 @@ rule sketch_fromfile:
     benchmark:  os.path.join(logs_dir, "sketch", "{basename}.{moltype}.benchmark")
     shell:
         """
-        sourmash sketch fromfile {input} -p dna,k=21,scaled=1,abund -o {output} 2> {log}
+        sourmash sketch fromfile {input.fromfile} -p dna,k=21,scaled=1,abund -o {output} 2> {log}
         """
