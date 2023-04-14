@@ -67,6 +67,7 @@ def retrieve_acc(acc_col):
          Failures are provided to aid in manual resolution of these issues.
          Options:
             no_accession - no NCBI accession was provided.
+            no_assembly  - no correesponding Assemblies dataset exists.
             parentheses  - Parentheses in an id, e.g "LK928904 (2253..10260)", indicate that the viral genome
                            is this sequence range within the host genome identified by the accession. We do not
                            want to mischaracterize the entire host genome as this virus; return a failure.
@@ -92,10 +93,13 @@ def retrieve_acc(acc_col):
         except RuntimeError:
             failure_reasons.append("retrieval")
             continue
-        all_accs.add(acc)
-        if len(all_accs) > 1:
-            failure_reasons.append("multiple_acc")
-            acc = ""
+        if not acc:
+            failure_reasons.append('no_assembly')
+        else:
+            all_accs.add(acc)
+            if len(all_accs) > 1:
+                failure_reasons.append("multiple_acc")
+                acc = ""
     return acc, failure_reasons
 
 
@@ -133,8 +137,7 @@ def main(args):
     if csv_file.endswith('xlsx'):
         import pandas as pd
         # VMR Reference file, v37
-        vmr_file = "inputs/VMR_21-221122_MSL37.xlsx"
-        vmr = pd.read_excel(vmr_file, sheet_name="VMRb37")
+        vmr = pd.read_excel(csv_file, sheet_name="VMRb37")
         csv_file = args.input_csv.split('xlsx')[0] + 'csv'
         vmr.to_csv(csv_file, index=False)
 
@@ -154,7 +157,7 @@ def cmdline(sys_args):
     "Command line entry point w/argparse action."
     p = argparse.ArgumentParser()
     p.add_argument("-i", "--input-csv", default= "inputs/VMR_21-221122_MSL37.xlsx")
-    p.add_argument("-o", "--output-csv", default='outputs/VMR_21-221122_MSL37.csv')
+    p.add_argument("-o", "--output-csv", default='inputs/VMR_21-221122_MSL37.acc.csv')
     args = p.parse_args()
     return main(args)
 
