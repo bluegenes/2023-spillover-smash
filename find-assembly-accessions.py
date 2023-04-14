@@ -67,7 +67,7 @@ def retrieve_acc(acc_col):
          Failures are provided to aid in manual resolution of these issues.
          Options:
             no_accession - no NCBI accession was provided.
-            no_assembly  - no correesponding Assemblies dataset exists.
+            no_assembly  - no corresponding Assemblies dataset exists.
             parentheses  - Parentheses in an id, e.g "LK928904 (2253..10260)", indicate that the viral genome
                            is this sequence range within the host genome identified by the accession. We do not
                            want to mischaracterize the entire host genome as this virus; return a failure.
