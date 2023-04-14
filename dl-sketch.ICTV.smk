@@ -1,5 +1,6 @@
-import pandas as pd
 import csv
+import pandas as pd
+import numpy as np
 
 out_dir = "output.vmr"
 logs_dir = os.path.join(out_dir, 'logs')
@@ -9,12 +10,40 @@ vmr_file = 'outputs/VMR_21-221122_MSL37.head100.csv'
 vmr = pd.read_csv(vmr_file)
 basename = "ictv"
 
-ACCESSIONS = vmr['GenBank Assembly ID'].tolist()
+null_list = ["", np.nan]
+ACCESSIONS = [a for a in vmr['GenBank Assembly ID'] if a and a not in null_list] # don't keep "" entries
+# print(ACCESSIONS)
+
+
+class Checkpoint_MakePattern:
+    def __init__(self, pattern):
+        self.pattern = pattern
+    
+    def get_filenames(self, basename=None, moltype=None):
+        df = pd.read_csv(f"{out_dir}/{basename}.fromfile.csv")
+        filename_col = 'genome_filename'
+        if moltype == "protein":
+            filename_col = 'protein_filename'
+        # filter df to get non-empties in relevant column
+        fastas = df[filename_col][df[filename_col].notnull()].tolist()
+
+        return fastas
+
+    def __call__(self, w):
+        global checkpoints
+        # wait for the results of 'check_fromfile'; this will trigger an
+        # exception until that rule has been run.
+        checkpoints.check_fromfile.get(**w)
+        #expand the pattern
+        fastas = self.get_filenames(**w)
+
+        pattern = expand(self.pattern, fn =fastas,**w)
+        print(pattern)
+        return pattern
 
 rule all:
-    input: 
-        expand(os.path.join(out_dir, "{basename}.{moltype}.zip"), basename = 'ictv', moltype = ['dna', 'protein']),
-
+    input:
+        expand(os.path.join(out_dir, f"{basename}.{{moltype}}.zip"), moltype = ['dna', 'protein']),
 
 ### Rules for ICTV GenBank Assemblies:
 # download genbank genome details; make an info.csv file for entry.
@@ -105,7 +134,6 @@ rule download_matching_proteome_wc:
                 #except:
                 #    shell('touch {output}')
 
-
 rule build_fromfile_from_assemblyinfo:
     input: 
         info=expand("genbank/info/{acc}.info.csv", acc=ACCESSIONS)
@@ -113,50 +141,25 @@ rule build_fromfile_from_assemblyinfo:
         csv = os.path.join(out_dir, "{basename}.fromfile.csv")
     run:
         with open(str(output.csv), "w") as outF:
-            header = 'name,genome_filename,protein_filename'
+            header = ["name","genome_filename","protein_filename"]
             outF.write(','.join(header) + '\n')
             for inp in input:
-                with open(str(inp)) as inF:
-                    r = csv.DictReader(csv_file)# has fields:  ["acc", "genome_url", "protein_url", "assembly_report_url", "ncbi_tax_name", "ncbi_taxid"] 
-                    rows = list(r)
+                with open(str(inp)) as csvfile:
+                    csv_reader = csv.DictReader(csvfile)# .# has fields:  ["acc", "genome_url", "protein_url", "assembly_report_url", "ncbi_tax_name", "ncbi_taxid"]
+                    rows = list(csv_reader)
                     assert len(rows) == 1
                     row = rows[0]
                     acc = row['acc']
                     name = acc + " " + row['ncbi_tax_name']
-                    gf = "genbank/genomes/{acc}_genomic.fna.gz"
+                    gf = f"genbank/genomes/{acc}_genomic.fna.gz"
                     pf= ""
                     if row["protein_url"]:
                         # do we want to add prodigal to go nucl --> protein where we don't yet have protein fastas to download?
-                        pf = "genbank/proteomes/{acc}_protein.faa.gz"
+                        pf = f"genbank/proteomes/{acc}_protein.faa.gz"
                     outF.write(f"{name},{gf},{pf}\n")
 
-
-class Checkpoint_MakePattern:
-    def __init__(self, pattern):
-        self.pattern = pattern
     
-    def get_filename(w):
-        df = pd.read_csv(f"{out_dir}/{w.basename}.fromfile.csv")
-        filename_col = 'genome_filename'
-        if w.moltype == "protein":
-            filename_col = 'protein_filename'
-        # filter df to get non-empties in relevant column
-        fastas = [p for p in df["protein_filename"] if p] # don't include empty entries
-        return fastas
-
-    
-    def __call__(self, w):
-        global checkpoints
-        # wait for the results of 'check_fromfile'; this will trigger an
-        # exception until that rule has been run.
-        checkpoints.check_fromfile.get(**w)
-        #expand the pattern
-        accs = self.get_acc()
-
-        pattern = expand(self.pattern, **w)
-        return pattern
-    
- # Define the checkpoint function
+ # Define the checkpoint function that allows us to read the fromfile.csv
 checkpoint check_fromfile:
     input: os.path.join(out_dir, f"{basename}.fromfile.csv"),
     output: touch(os.path.join(out_dir,".check_fromfile"))
@@ -165,7 +168,6 @@ checkpoint check_fromfile:
 paramD = {"dna": "dna,k=21,scaled=1,abund", "protein": "protein,k=10,scaled=1,abund"}
 rule sketch_fromfile:
     input: 
-        #os.path.join(out_dir, "checkpoint.fasta_download"),
         os.path.join(out_dir, "{basename}.fromfile.csv"),
         Checkpoint_MakePattern("{fn}"),
     output: os.path.join(out_dir, "{basename}.{moltype}.zip")
@@ -184,11 +186,3 @@ rule sketch_fromfile:
         """
         sourmash sketch fromfile {input} -p dna,k=21,scaled=1,abund -o {output} 2> {log}
         """
-
-
-        # filtered_df = df[df[filename_col] != ""]
-        # names = filtered_df["name"].tolist()
-        # accs = [n.split(' ')[0] for n in names]
-        # return accs
-        #protein = [p for p in df["protein_filename"] if p]
-        #return {"dna": dna, "protein": protein}
