@@ -5,8 +5,8 @@ import numpy as np
 out_dir = "output.vmr"
 logs_dir = os.path.join(out_dir, 'logs')
 
-# vmr_file = 'inputs/VMR_21-221122_MSL37.acc.csv'
-vmr_file = 'outputs/VMR_21-221122_MSL37.head100.csv'
+vmr_file = 'inputs/VMR_21-221122_MSL37.acc.csv'
+#vmr_file = 'outputs/VMR_21-221122_MSL37.head100.csv'
 vmr = pd.read_csv(vmr_file)
 basename = "ictv"
 
@@ -68,7 +68,7 @@ rule download_matching_genome_wc:
     input:
         csvfile = ancient('genbank/info/{acc}.info.csv')
     output:
-        genome = "genbank/genomes/{acc}_genomic.fna.gz"
+        genome = protected("genbank/genomes/{acc}_genomic.fna.gz")
     threads: 1
     resources:
         mem_mb=3000,
@@ -103,13 +103,13 @@ rule download_matching_proteome_wc:
     input:
         csvfile = ancient('genbank/info/{acc}.info.csv')
     output:
-        proteome = "genbank/proteomes/{acc}_protein.faa.gz"
+        proteome = protected("genbank/proteomes/{acc}_protein.faa.gz")
     threads: 1
     resources:
          mem_mb=3000,
          runtime=60,
          time=90,
-         partition="bml",#"low2", # bml
+         partition="low2", # bml
     run:
         with open(input.csvfile, 'rt') as infp:
             r = csv.DictReader(infp)
@@ -138,6 +138,7 @@ rule build_fromfile_from_assemblyinfo:
         info=expand("genbank/info/{acc}.info.csv", acc=ACCESSIONS)
     output:
         csv = os.path.join(out_dir, "{basename}.fromfile.csv")
+    threads: 1
     run:
         with open(str(output.csv), "w") as outF:
             header = ["name","genome_filename","protein_filename"]

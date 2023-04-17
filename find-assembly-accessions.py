@@ -73,7 +73,7 @@ def retrieve_acc(acc_col):
                            want to mischaracterize the entire host genome as this virus; return a failure.
             retrieval    - some error was encountered while attempting to find the accession via entrez.
                            This may occur due to removal or modification of the accession.
-            multiple acc - multiple assembly accessions were returned via the list of nucleotide accessions.
+            multiple_acc - multiple assembly accessions were returned via the list of nucleotide accessions.
                            The multiple accessions in any entry should correspond to segments of a segmented virus,
                            all of which should be collected into a single 'Assembly Dataset' Accession we can retrieve.
                            If we encounter multiple accessions, it may indicate an accession removal or modification.

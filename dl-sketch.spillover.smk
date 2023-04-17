@@ -50,9 +50,9 @@ rule all:
 
 rule download_spillover_accession:
     output: 
-        nucl="{basename}/genomic/{acc}.fna.gz",
-        prot="{basename}/protein/{acc}.faa.gz",
-        fileinfo="{basename}/{acc}.fileinfo.csv",
+        nucl=protected(os.path.join(out_dir"{basename}/genomic/{acc}.fna.gz")),
+        prot=protected(os.path.join("{basename}/protein/{acc}.faa.gz")),
+        fileinfo=protected(os.path.join("{basename}/{acc}.fileinfo.csv")),
     conda: "conf/env/biopython.yml"
     log: os.path.join(logs_dir, "downloads", "{basename}/{acc}.log")
     benchmark: os.path.join(logs_dir, "downloads", "{basename}/{acc}.benchmark")
@@ -71,7 +71,7 @@ rule aggregate_fileinfo_to_fromfile:
     input: 
         fileinfo=expand("{basename}/{acc}.fileinfo.csv", acc=ACCESSIONS, basename="spillover")
     output:
-        csv = os.path.join(out_dir, "{basename}.fromfile.csv")
+        csv = protected(os.path.join(out_dir, "{basename}.fromfile.csv"))
     run:
         with open(str(output.csv), "w") as outF:
             header = 'name,genome_filename,protein_filename'
