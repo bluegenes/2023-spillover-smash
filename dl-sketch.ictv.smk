@@ -133,6 +133,7 @@ rule download_matching_proteome_wc:
                 #except:
                 #    shell('touch {output}')
 
+localrules: build_fromfile_from_assemblyinfo
 rule build_fromfile_from_assemblyinfo:
     input: 
         info=expand("genbank/info/{acc}.info.csv", acc=ACCESSIONS)
@@ -175,10 +176,10 @@ rule sketch_fromfile:
         lambda w: paramD[w.moltype]
     threads: 1
     resources:
-        mem_mb=3000,
-        runtime=60,
-        time=90,
-        partition="low2",
+        mem_mb=6000,
+        runtime=4000,
+        time=4000,
+        partition="high2",
     conda: "conf/env/sourmash.yml"
     log:  os.path.join(logs_dir, "sketch", "{basename}.{moltype}.log")
     benchmark:  os.path.join(logs_dir, "sketch", "{basename}.{moltype}.benchmark")
