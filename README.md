@@ -34,6 +34,8 @@ With assembly accessions in hand, we now download all viral genomes from NCBI an
 
 This is currently written to download and sketch all available assembly accessions, but we may want to build a smaller database containing only the `exemplar` genomes, leaving out the `additional` isolates. In the `VMR_21-221122_MSL37.csv` file, there are 10435 Exemplar and 1626 'Additional'.
 
+Ran into an exception here: GCA_004789135.1 is supressed. For now, manually removed from accession file. In the future, need programmatic query for determining whether record has been supressed -- should be feasible to add to the first step, where we use biopython entrez to link assembly identifiers.
+
 ## Build SpillOver Database
 
 For the SpillOver sequences, we can download the provided accessions directly. We use the `2023-03-27_spillover_accession-numers.csv` as input into `dl-sketch.spillover.smk` snakefile, selecting accessions from the `AccessionNumber` column. 

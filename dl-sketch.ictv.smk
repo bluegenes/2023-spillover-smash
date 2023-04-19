@@ -185,5 +185,5 @@ rule sketch_fromfile:
     benchmark:  os.path.join(logs_dir, "sketch", "{basename}.{moltype}.benchmark")
     shell:
         """
-        sourmash sketch fromfile {input.fromfile} -p dna,k=21,scaled=1,abund -o {output} 2> {log}
+        sourmash sketch fromfile {input.fromfile} -p {params} -o {output} 2> {log}
         """
