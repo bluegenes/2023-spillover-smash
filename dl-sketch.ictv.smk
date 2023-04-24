@@ -166,7 +166,7 @@ checkpoint check_fromfile:
     output: touch(os.path.join(out_dir,".check_fromfile"))
 
 
-paramD = {"dna": "dna,k=21,scaled=1,abund", "protein": "protein,k=10,scaled=1,abund"}
+paramD = {"dna": "dna,k=21,31,scaled=1,abund", "protein": "protein,k=7,k=10,scaled=1,abund"}
 rule sketch_fromfile:
     input: 
         fromfile=os.path.join(out_dir, "{basename}.fromfile.csv"),
@@ -185,5 +185,5 @@ rule sketch_fromfile:
     benchmark:  os.path.join(logs_dir, "sketch", "{basename}.{moltype}.benchmark")
     shell:
         """
-        sourmash sketch fromfile {input.fromfile} -p {params} -o {output} 2> {log}
+        sourmash sketch fromfile {input.fromfile} -p {params} -o {output} --report-duplicated --ignore-missing 2> {log}
         """

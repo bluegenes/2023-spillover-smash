@@ -28,13 +28,23 @@ Exceptions:
     - Primarily a check for any errors occurring during entrez database queries.
 
 
-## Download Viral Assemblies and build a `sourmash` database
+### Download Viral Assemblies and build a `sourmash` database
 
 With assembly accessions in hand, we now download all viral genomes from NCBI and index them as a sourmash database. We use the file generated above as input into the `dl-sketch.ICTV.smk` snakefile. 
 
 This is currently written to download and sketch all available assembly accessions, but we may want to build a smaller database containing only the `exemplar` genomes, leaving out the `additional` isolates. In the `VMR_21-221122_MSL37.csv` file, there are 10435 Exemplar and 1626 'Additional'.
 
-Ran into an exception here: GCA_004789135.1 is supressed. For now, manually removed from accession file. In the future, need programmatic query for determining whether record has been supressed -- should be feasible to add to the first step, where we use biopython entrez to link assembly identifiers.
+Issues:
+- Ran into an exception during download: GCA_004789135.1 is supressed. For now, manually removed from accession file. In the future, need programmatic query for determining whether record has been supressed -- should be feasible to add to the first step, where we use biopython entrez to link assembly identifiers.
+- 6 records have duplicate entries in the csv file:
+  > GCF_001041915.1 Mycobacterium phage Fionnbharth
+  > GCF_001745335.1 Shigella phage SHBML-50-1
+  > GCF_002625825.1 Rhodococcus phage Hiro
+  > GCF_003308095.1 Rhodococcus phage Takoda
+  > GCF_004138835.1 Salmonella phage 3-29
+  > GCF_004138895.1 Pseudomonas phage vB_PaeM_SCUT-S1
+  > Since the duplicated entries in the `fromfile.csv` file are identical, they were manually removed for now. This should be automated in the future.
+
 
 ## Build SpillOver Database
 

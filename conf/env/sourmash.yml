@@ -5,4 +5,4 @@ channels:
   - defaults
 dependencies:
   - python=3.10
-  - sourmash>=4.8,<5
+  - sourmash>=4.8.2,<5
