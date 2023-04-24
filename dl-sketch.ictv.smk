@@ -166,7 +166,7 @@ checkpoint check_fromfile:
     output: touch(os.path.join(out_dir,".check_fromfile"))
 
 
-paramD = {"dna": "dna,k=21,31,scaled=1,abund", "protein": "protein,k=7,k=10,scaled=1,abund"}
+paramD = {"dna": "dna,k=21,k=31,scaled=1,abund", "protein": "protein,k=7,k=10,scaled=1,abund"}
 rule sketch_fromfile:
     input: 
         fromfile=os.path.join(out_dir, "{basename}.fromfile.csv"),
