@@ -37,12 +37,13 @@ This is currently written to download and sketch all available assembly accessio
 Issues:
 - Ran into an exception during download: GCA_004789135.1 is supressed. For now, manually removed from accession file. In the future, need programmatic query for determining whether record has been supressed -- should be feasible to add to the first step, where we use biopython entrez to link assembly identifiers.
 - 6 records have duplicate entries in the csv file:
-  > GCF_001041915.1 Mycobacterium phage Fionnbharth
-  > GCF_001745335.1 Shigella phage SHBML-50-1
-  > GCF_002625825.1 Rhodococcus phage Hiro
-  > GCF_003308095.1 Rhodococcus phage Takoda
-  > GCF_004138835.1 Salmonella phage 3-29
-  > GCF_004138895.1 Pseudomonas phage vB_PaeM_SCUT-S1
+  > - GCF_001041915.1 Mycobacterium phage Fionnbharth
+  > - GCF_001745335.1 Shigella phage SHBML-50-1
+  > - GCF_002625825.1 Rhodococcus phage Hiro
+  > - GCF_003308095.1 Rhodococcus phage Takoda
+  > -GCF_004138835.1 Salmonella phage 3-29
+  > - GCF_004138895.1 Pseudomonas phage vB_PaeM_SCUT-S1
+  
   > Since the duplicated entries in the `fromfile.csv` file are identical, they were manually removed for now. This should be automated in the future.
 
 
