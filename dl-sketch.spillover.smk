@@ -2,12 +2,12 @@ import pandas as pd
 import csv
 import numpy as np
 
-out_dir = "output.sp"
+out_dir = "output.spillover"
 logs_dir = os.path.join(out_dir, 'logs')
 basename="spillover"
 
-#sp_file = 'inputs/2023-03-27_spillover_accession-numers.csv'
-sp_file = 'inputs/2023-03-27_spillover_accession-numers.head100.csv'
+sp_file = 'inputs/2023-03-27_spillover_accession-numers.csv'
+#sp_file = 'inputs/2023-03-27_spillover_accession-numers.head100.csv'
 
 sp = pd.read_csv(sp_file)
 
@@ -46,16 +46,16 @@ class Checkpoint_MakePattern:
 
 rule all:
     input:
-        expand(os.path.join(out_dir, f"{basename}.{{moltype}}.zip"), moltype = ['dna', 'protein']),
+        expand(os.path.join(out_dir, f"{basename}.{{moltype}}.zip"), moltype = ['dna']),#, 'protein']),
 
 rule download_spillover_accession:
     output: 
-        nucl=protected(os.path.join(out_dir"{basename}/genomic/{acc}.fna.gz")),
-        prot=protected(os.path.join("{basename}/protein/{acc}.faa.gz")),
-        fileinfo=protected(os.path.join("{basename}/{acc}.fileinfo.csv")),
+        nucl=protected(os.path.join(out_dir, "genomic/{acc}.fna.gz")),
+        fileinfo=protected(os.path.join(out_dir, "fileinfo/{acc}.fileinfo.csv")),
+        prot=protected(os.path.join(out_dir, "protein/{acc}.faa.gz")),
     conda: "conf/env/biopython.yml"
-    log: os.path.join(logs_dir, "downloads", "{basename}/{acc}.log")
-    benchmark: os.path.join(logs_dir, "downloads", "{basename}/{acc}.benchmark")
+    log: os.path.join(logs_dir, "downloads", "{acc}.log")
+    benchmark: os.path.join(logs_dir, "downloads", "{acc}.benchmark")
     threads: 1
     resources:
         mem_mb=3000,
@@ -69,7 +69,7 @@ rule download_spillover_accession:
 
 rule aggregate_fileinfo_to_fromfile:
     input: 
-        fileinfo=expand("{basename}/{acc}.fileinfo.csv", acc=ACCESSIONS, basename="spillover")
+        fileinfo=expand(os.path.join(out_dir, "fileinfo/{acc}.fileinfo.csv"), acc=ACCESSIONS)
     output:
         csv = protected(os.path.join(out_dir, "{basename}.fromfile.csv"))
     run:
@@ -78,14 +78,14 @@ rule aggregate_fileinfo_to_fromfile:
             outF.write(','.join(header) + '\n')
             for inp in input:
                 with open(str(inp)) as inF:
-                    outfile.write(inF.read())
+                    outF.write(inF.read())
 
  # Define the checkpoint function that allows us to read the fromfile.csv
 checkpoint check_fromfile:
     input: os.path.join(out_dir, f"{basename}.fromfile.csv"),
     output: touch(os.path.join(out_dir,".check_fromfile"))
 
-paramD = {"dna": "dna,k=21,scaled=1,abund", "protein": "protein,k=10,scaled=1,abund"}
+paramD = {"dna": "dna,k=21,k=31,scaled=1,abund", "protein": "protein,k=7,k=10,scaled=1,abund"}
 rule sketch_fromfile:
     input: 
         fromfile=os.path.join(out_dir, "{basename}.fromfile.csv"),

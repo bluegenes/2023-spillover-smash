@@ -37,9 +37,15 @@ def main(args):
     for feature in record.features:
         if feature.type == "CDS":
             if "translation" in feature.qualifiers:
-                protein_sequences.append((feature.qualifiers["translation"][0], feature.qualifiers["locus_tag"][0]))
+                #import pdb;pdb.set_trace()
+                #protein_sequences.append((feature.qualifiers["translation"][0], feature.qualifiers["locus_tag"][0]))
+                protein_sequences.append((feature.qualifiers["translation"][0], feature.qualifiers["protein_id"][0]))
 
     # Determine the output filenames
+    nucleotide_file = args.nucleotide
+    protein_file = args.protein
+    fileinfo_file = args.fileinfo
+    protein_exists=False
     if args.nucleotide is None:
         nucleotide_file = f"{accession}.fna.gz"
     if args.protein is None and len(protein_sequences) > 0:
@@ -54,9 +60,11 @@ def main(args):
         protein_exists = True
     if protein_exists:
         with gzip.open(protein_file, "wt") as f:
-            for i, (protein_sequence, locus_tag) in enumerate(protein_sequences):
-                f.write(f">{accession}_CDS{i+1}|{locus_tag}\n{protein_sequence}\n")
-    
+            #for i, (protein_sequence, locus_tag) in enumerate(protein_sequences):
+            #    f.write(f">{accession}_CDS{i+1}|{locus_tag}\n{protein_sequence}\n")
+            for i, (protein_sequence, protein_id) in enumerate(protein_sequences):
+                f.write(f">{accession}_CDS{i+1}|{protein_id}\n{protein_sequence}\n")
+
     # Output file details on to a CSV file
     name = accession + ' ' + organism_name
     with open(fileinfo_file, "w", newline='') as csvfile:
@@ -65,7 +73,7 @@ def main(args):
             writer.writerow([name, nucleotide_file, protein_file])
         else:
             writer.writerow([name, nucleotide_file,""])
-            
+
 
 
 def cmdline(sys_args):
@@ -75,7 +83,7 @@ def cmdline(sys_args):
     parser.add_argument("--nucleotide", type=str, help="The filename for the nucleotide FASTA file")
     parser.add_argument("--protein", type=str, help="The filename for the protein FASTA file")
     parser.add_argument("--fileinfo", type=str, help="Filename details for downstream. Only includes protein file if it existed for download.")
-    
+
     # Parse command line arguments
     args = parser.parse_args()
 

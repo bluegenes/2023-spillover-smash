@@ -137,7 +137,7 @@ def main(args):
     if csv_file.endswith('xlsx'):
         import pandas as pd
         # VMR Reference file, v37
-        vmr = pd.read_excel(csv_file, sheet_name="VMRb37")
+        vmr = pd.read_excel(csv_file, sheet_name=args.sheet_name)
         csv_file = args.input_csv.split('xlsx')[0] + 'csv'
         vmr.to_csv(csv_file, index=False)
 
@@ -158,6 +158,7 @@ def cmdline(sys_args):
     p = argparse.ArgumentParser()
     p.add_argument("-i", "--input-csv", default= "inputs/VMR_21-221122_MSL37.xlsx")
     p.add_argument("-o", "--output-csv", default='inputs/VMR_21-221122_MSL37.acc.csv')
+    p.add_argument("-s", "--sheet-name", default='VMRb37')
     args = p.parse_args()
     return main(args)
 
