@@ -7,12 +7,16 @@ logs_dir = os.path.join(out_dir, 'logs')
 basename="spillover"
 
 sp_file = 'inputs/2023-03-27_spillover_accession-numers.csv'
-#sp_file = 'inputs/2023-03-27_spillover_accession-numers.head100.csv'
 
 sp = pd.read_csv(sp_file)
 
 null_list = [np.nan, "Unknown", ""]
 ACCESSIONS = [a for a in sp['AccessionNumber'] if a and a not in null_list] # don't keep "" entries
+
+# to test, let's only use the first 1000
+#basename="spillover1000"
+#ACCESSIONS = ACCESSIONS[:1000]
+
 # Get a list of non-null and non-"Unknown" values in column1
 #non_null_values = vmr.loc[vmr.notnull(vmr["AccessionNumber"]) & (vmr["AccessionNumber"] != "Unknown"), "AccessionNumber"].tolist()
 #import pdb;pdb.set_trace()
@@ -52,6 +56,7 @@ rule download_spillover_accession:
     output: 
         nucl=protected(os.path.join(out_dir, "genomic/{acc}.fna.gz")),
         fileinfo=protected(os.path.join(out_dir, "fileinfo/{acc}.fileinfo.csv")),
+    params:
         prot=protected(os.path.join(out_dir, "protein/{acc}.faa.gz")),
     conda: "conf/env/biopython.yml"
     log: os.path.join(logs_dir, "downloads", "{acc}.log")
@@ -64,7 +69,7 @@ rule download_spillover_accession:
         partition="low2",
     shell:
         """
-        python genbank_nuccore.py {wildcards.acc} --nucleotide {output.nucl} --protein {output.prot} --fileinfo {output.fileinfo} 2> {log}
+        python genbank_nuccore.py {wildcards.acc} --nucleotide {output.nucl} --protein {params.prot} --fileinfo {output.fileinfo} 2> {log}
         """
 
 rule aggregate_fileinfo_to_fromfile:
@@ -75,7 +80,7 @@ rule aggregate_fileinfo_to_fromfile:
     run:
         with open(str(output.csv), "w") as outF:
             header = 'name,genome_filename,protein_filename'
-            outF.write(','.join(header) + '\n')
+            outF.write(header + '\n')
             for inp in input:
                 with open(str(inp)) as inF:
                     outF.write(inF.read())
