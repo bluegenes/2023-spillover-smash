@@ -1,11 +1,13 @@
 import pandas as pd
 import csv
 
-out_dir = "output.sp"
+out_dir = "output.spillover"
 logs_dir = os.path.join(out_dir, 'logs')
-basename="spillover"
+#basename="spillover"
+basename="spillover100"
 
-sp_fromfile = 'output.sp/spillover.fromfile.csv'
+#sp_fromfile = 'output.sp/spillover.fromfile.csv'
+sp_fromfile = 'output.spillover/spillover100.fromfile.csv'
 sp = pd.read_csv(sp_fromfile)
 dna_names = sp["name"][sp["genome_filename"].notnull()].tolist()
 dna_acc = [n.split(' ')[0] for n in dna_names]
@@ -14,10 +16,9 @@ prot_acc = [n.split(' ')[0] for n in prot_names]
 
 # search_databases = config['search_databases'] # must be dictionary
 # search_databases = f"{basename}.{{moltype}}.zip"), moltype = ['dna', 'protein']),
-ksize = config.get("ksize", [31])
+ksize = config.get("ksize", [21])
 if not isinstance(ksize, list):
     ksize=[ksize]
-
 
 onstart:
     print("------------------------------")
@@ -35,14 +36,14 @@ onerror:
 rule all:
     input:
         expand(os.path.join(out_dir, 'gather', 'dna', '{acc}.k{ks}.gather.csv'), ks=ksize, acc=dna_acc),
-        expand(os.path.join(out_dir, 'gather', 'protein', '{acc}.k{ks}.gather.csv'), ks=ksize, acc=prot_acc),
+        #expand(os.path.join(out_dir, 'gather', 'protein', '{acc}.k{ks}.gather.csv'), ks=ksize, acc=prot_acc),
         expand(os.path.join(out_dir, 'prefetch', 'dna', '{acc}.k{ks}.prefetch.csv'), ks=ksize, acc=dna_acc),
-        expand(os.path.join(out_dir, 'prefetch', 'protein', '{acc}.k{ks}.prefetch.csv'), ks=ksize, acc=prot_acc),
+        #expand(os.path.join(out_dir, 'prefetch', 'protein', '{acc}.k{ks}.prefetch.csv'), ks=ksize, acc=prot_acc),
     
 
 rule sourmash_prefetch:
     input:
-        query_zip=os.path.join(out_dir, f"{basename}.{{moltype}}.sig.zip"),
+        query_zip=os.path.join(out_dir, f"{basename}.{{moltype}}.zip"),
         database= "output.vmr/ictv.{moltype}.zip"
         # databases = lambda w: search_databases[f"k{w.ksize}"],
     output:
@@ -75,7 +76,7 @@ rule sourmash_prefetch:
 
 rule sourmash_gather:
     input:
-        query_zip=os.path.join(out_dir, f"{basename}.{{moltype}}.sig.zip"),
+        query_zip=os.path.join(out_dir, f"{basename}.{{moltype}}.zip"),
         database = "output.vmr/ictv.{moltype}.zip"
     output:
         gather_csv=os.path.join(out_dir, 'gather', '{moltype}', '{acc}.k{ksize}.gather.csv'),

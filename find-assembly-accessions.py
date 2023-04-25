@@ -4,7 +4,7 @@ import csv
 from Bio import Entrez
 
 # Set email address for NCBI access
-Entrez.email = "ntpierce@gmail.com"
+Entrez.email = "ntpierce@ucdavis.edu"
 
 def retrieve_assembly_accession(identifier):
     """
