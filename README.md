@@ -44,7 +44,7 @@ Issues:
   > -GCF_004138835.1 Salmonella phage 3-29
   > - GCF_004138895.1 Pseudomonas phage vB_PaeM_SCUT-S1
   
-  > Since the duplicated entries in the `fromfile.csv` file are identical, they were manually removed for now. This should be automated in the future.
+  > Since the duplicated entries in the `fromfile.csv` file are identical, they were removed via `awk '!x[$0]++' $filename > $filename-new` for now. This should be automated in the future.
 
 
 ## Build SpillOver Database
@@ -53,5 +53,6 @@ For the SpillOver sequences, we can download the provided accessions directly. W
 
 Exceptions:
 - Some entries (384 of 34220 total) contain `Unknown` accessions, which means we cannot download their sequences for reclassification.
+- 269 were duplicated entries. As above, these were removed via `awk '!x[$0]++' $filename > $filename-new` for now, checked, and then moved back to the original filename. This should be automated in the future.
 
 ## Classify SpillOver Sequences

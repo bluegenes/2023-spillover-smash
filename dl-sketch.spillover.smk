@@ -50,7 +50,7 @@ class Checkpoint_MakePattern:
 
 rule all:
     input:
-        expand(os.path.join(out_dir, f"{basename}.{{moltype}}.zip"), moltype = ['dna']),#, 'protein']),
+        expand(os.path.join(out_dir, f"{basename}.{{moltype}}.zip"), moltype = ['dna','protein']),
 
 rule download_spillover_accession:
     output: 
@@ -109,5 +109,5 @@ rule sketch_fromfile:
     benchmark:  os.path.join(logs_dir, "sketch", "{basename}.{moltype}.benchmark")
     shell:
         """
-        sourmash sketch fromfile {input.fromfile} -p {params} -o {output} 2> {log}
+        sourmash sketch fromfile {input.fromfile} -p {params} -o {output} --report-duplicated --ignore-missing 2> {log}
         """

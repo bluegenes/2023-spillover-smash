@@ -53,9 +53,9 @@ rule sourmash_prefetch:
         threshold_bp = 0,
         alpha_cmd = lambda w: "--" + w.moltype,
     resources:
-        mem_mb=lambda wildcards, attempt: attempt *100000,
-        time=10000,
-        #partition="bmh",
+        mem_mb=lambda wildcards, attempt: attempt *5000,
+        time=60,
+        partition="low2",
     log: os.path.join(logs_dir, "prefetch", '{moltype}', "{acc}.k{ksize}.prefetch.log")
     benchmark: os.path.join(logs_dir, "prefetch", '{moltype}', "{acc}.k{ksize}.prefetch.benchmark")
     conda: "conf/env/sourmash.yml"
@@ -65,7 +65,7 @@ rule sourmash_prefetch:
         echo "DB(s): {input.database}"
         echo "DB(s): {input.database}" > {log}
 
-        sourmash sig grep {wildcards.acc} {input.query_zip} {params.alpha_cmd} \
+        sourmash sig grep {wildcards.acc} {input.query_zip} \
                           --ksize {wildcards.ksize} | sourmash prefetch - {input.database} \
                           {params.alpha_cmd} --ksize {wildcards.ksize} --threshold-bp {params.threshold_bp} \
                           -o {output.prefetch_csv} > {output.prefetch_txt} 2>> {log}
@@ -85,9 +85,9 @@ rule sourmash_gather:
         threshold_bp = 0,
         alpha_cmd = lambda w: "--" + w.moltype,
     resources:
-        mem_mb=lambda wildcards, attempt: attempt *100000,
-        time=10000,
-        #partition="bmh",
+        mem_mb=lambda wildcards, attempt: attempt *5000,
+        time=240,
+        partition="bml",
     log: os.path.join(logs_dir, "gather", '{moltype}', "{acc}.k{ksize}.gather.log")
     benchmark: os.path.join(logs_dir, "gather", '{moltype}', "{acc}.k{ksize}.gather.benchmark")
     conda: "conf/env/sourmash.yml"
@@ -105,3 +105,4 @@ rule sourmash_gather:
         touch {output.gather_txt}
         touch {output.gather_csv}
         """
+
