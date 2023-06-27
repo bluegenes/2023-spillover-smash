@@ -1,5 +1,6 @@
 inputs/*
 output.*/*
 genbank/*
+refseq/*
 outputs/*
 .DS_Store
