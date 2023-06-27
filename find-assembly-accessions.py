@@ -156,9 +156,9 @@ def main(args):
 def cmdline(sys_args):
     "Command line entry point w/argparse action."
     p = argparse.ArgumentParser()
-    p.add_argument("-i", "--input-csv", default= "inputs/VMR_21-221122_MSL37.xlsx")
-    p.add_argument("-o", "--output-csv", default='inputs/VMR_21-221122_MSL37.acc.csv')
-    p.add_argument("-s", "--sheet-name", default='VMRb37')
+    p.add_argument("-i", "--input-csv", default= "inputs/VMR_MSL38_v1.csv")
+    p.add_argument("-o", "--output-csv", default='inputs/VMR_MSL38_v1.acc.csv')
+    p.add_argument("-s", "--sheet-name", default='VMR MSL38 v1')
     args = p.parse_args()
     return main(args)
 

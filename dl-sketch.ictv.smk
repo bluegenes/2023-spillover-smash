@@ -5,10 +5,16 @@ import numpy as np
 out_dir = "output.vmr"
 logs_dir = os.path.join(out_dir, 'logs')
 
-vmr_file = 'inputs/VMR_21-221122_MSL37.acc.csv'
+
+#vmr_file = 'inputs/VMR_MSL38_v1.acc.csv'
+vmr_file = 'inputs/spumavirus.VMR_MSL38v1.acc.csv'
+#vmr_file = 'inputs/VMR_MSL38_v1.acc.head100.csv'
+#vmr_file = 'inputs/VMR_21-221122_MSL37.acc.csv'
 #vmr_file = 'outputs/VMR_21-221122_MSL37.head100.csv'
 vmr = pd.read_csv(vmr_file)
-basename = "ictv"
+#basename = "ictv-h100"
+#basename = "ictv"
+basename = "ictv-spumavirus"
 
 null_list = ["", np.nan]
 ACCESSIONS = [a for a in vmr['GenBank Assembly ID'] if a and a not in null_list] # don't keep "" entries
@@ -43,6 +49,8 @@ class Checkpoint_MakePattern:
 rule all:
     input:
         expand(os.path.join(out_dir, f"{basename}.{{moltype}}.zip"), moltype = ['dna', 'protein']),
+        expand(os.path.join(out_dir, "blast", f"{basename}.dna.index.nhr")),
+        expand(os.path.join(out_dir, "diamond", f"{basename}.protein.fa.gz.dmnd")),
 
 ### Rules for ICTV GenBank Assemblies:
 # download genbank genome details; make an info.csv file for entry.
@@ -187,3 +195,49 @@ rule sketch_fromfile:
         """
         sourmash sketch fromfile {input.fromfile} -p {params} -o {output} --report-duplicated --ignore-missing 2> {log}
         """
+
+rule combine_fasta:
+    input: 
+        fromfile=os.path.join(out_dir, "{basename}.fromfile.csv"),
+        fastas=ancient(Checkpoint_MakePattern("{fn}")),
+    output: os.path.join(out_dir, "{basename}.{moltype}.fa.gz")
+    params:
+    log:  os.path.join(logs_dir, "combine", "{basename}.{moltype}.log")
+    benchmark:  os.path.join(logs_dir, "combine", "{basename}.{moltype}.benchmark")
+    shell:
+        """
+        zcat {input.fastas} | gzip > {output} 2> {log}
+        """
+
+
+# Rule to build BLAST index for the combined gzipped fasta file
+rule build_nucl_index:
+    input:
+        fasta = os.path.join(out_dir, "{basename}.dna.fa.gz")
+    output:
+        index = os.path.join(out_dir, "blast", "{basename}.dna.index.nhr")
+    params:
+        title = os.path.join("{basename}"),
+        out_base = os.path.join(out_dir, "blast", "{basename}.dna.index")
+    log:  os.path.join(logs_dir, "blast-index", "{basename}.dna.log")
+    benchmark:  os.path.join(logs_dir, "blast-index", "{basename}.dna.benchmark")
+    conda: "conf/env/blast.yml"
+    shell:
+        """
+        gunzip -c {input.fasta} | makeblastdb -in - -dbtype nucl -parse_seqids \
+               -out {params.out_base} -title {params.title} 2> {log}
+        """
+
+rule build_prot_index:
+    input:
+        fasta = os.path.join(out_dir, "{basename}.protein.fa.gz"),
+    output:
+        index = os.path.join(out_dir, "diamond", "{basename}.protein.fa.gz" + ".dmnd"),
+    log:  os.path.join(logs_dir, "diamond-index", "{basename}.log")
+    benchmark:  os.path.join(logs_dir, "diamond-index", "{basename}.benchmark")
+    conda: "conf/env/diamond.yml"
+    shell:
+        """
+        diamond makedb --in {input.fasta} --db {output.index} --quiet 2> {log}
+        """
+
