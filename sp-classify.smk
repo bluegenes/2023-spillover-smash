@@ -18,6 +18,7 @@ prot_acc = [n.split(' ')[0] for n in prot_names]
 
 # test simian foamy virus
 sm_file = 'inputs/simian-foamy.spillover.csv'
+basename = "spumavirus"
 sm = pd.read_csv(sm_file)
 dna_acc = sm['AccessionNumber']
 
@@ -50,7 +51,7 @@ rule all:
         #expand(os.path.join(out_dir, 'gather', 'protein', '{acc}.k{ks}.gather.csv'), ks=ksize, acc=prot_acc),
         expand(os.path.join(out_dir, 'prefetch', 'dna', '{acc}.k{ks}.prefetch.csv'), ks=ksize, acc=dna_acc),
         #expand(os.path.join(out_dir, 'prefetch', 'protein', '{acc}.k{ks}.prefetch.csv'), ks=ksize, acc=prot_acc),
-        expand(os.path.join(out_dir, 'gather', '{basename}.{moltype}-k{ks}.gather-classifications.csv'), basename = basename, moltype='dna', ks=ksize, acc=dna_acc)
+        expand(os.path.join(out_dir, '{basename}.{moltype}-k{ks}.gather-classifications.csv'), basename = basename, moltype='dna', ks=ksize, acc=dna_acc)
     
 rule sourmash_prefetch:
     input:
@@ -145,7 +146,7 @@ rule aggregate_classifications:
     input:
         cl = lambda w: expand(os.path.join(out_dir, 'gather', '{moltype}', '{acc}.k{ksize}.gather.classifications.csv'), acc = dna_acc, moltype = 'dna', ksize=w.ksize),
     output:
-        cl_all = os.path.join(out_dir, 'gather', '{basename}.{moltype}-k{ksize}.gather-classifications.csv'),
+        cl_all = os.path.join(out_dir, '{basename}.{moltype}-k{ksize}.gather-classifications.csv'),
     run:
         with open(str(output), 'w') as outF:
             w = csv.writer(outF)

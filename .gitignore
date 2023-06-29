@@ -4,3 +4,5 @@ genbank/*
 refseq/*
 outputs/*
 .DS_Store
+*.sig
+.snakemake

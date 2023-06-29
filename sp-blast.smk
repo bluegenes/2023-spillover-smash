@@ -25,7 +25,7 @@ ictv_tax = pd.read_csv(tax_file)
 columns_to_select = ['Realm', 'Subrealm', 'Kingdom', 'Subkingdom', 'Phylum', 'Subphylum', 'Class', 'Subclass',
                      'Order', 'Suborder', 'Family', 'Subfamily', 'Genus', 'Subgenus', 'Species', 'Virus name(s)']
 #df['taxonomy'] = df[columns_to_select].apply(lambda x: ';'.join(x.dropna().astype(str)), axis=1)
-ictv_tax['taxonomy'] = 'Viruses;' + ictv_tax[columns_to_select].apply(lambda x: ';'.join(x.dropna().astype(str)), axis=1)
+ictv_tax['taxonomy'] = 'Viruses;' + ictv_tax[columns_to_select].fillna('').apply(lambda x: ';'.join(x.astype(str)), axis=1)
 
 ictvD = dict(zip(ictv_tax['Virus REFSEQ accession'], ictv_tax['taxonomy']))
 ictvD_gb = dict(zip(ictv_tax['Virus GENBANK accession'], ictv_tax['taxonomy']))
