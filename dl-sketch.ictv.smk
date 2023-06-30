@@ -6,15 +6,15 @@ out_dir = "output.vmr"
 logs_dir = os.path.join(out_dir, 'logs')
 
 
-#vmr_file = 'inputs/VMR_MSL38_v1.acc.csv'
-vmr_file = 'inputs/spumavirus.VMR_MSL38v1.acc.csv'
+vmr_file = 'inputs/VMR_MSL38_v1.acc.csv'
+#vmr_file = 'inputs/spumavirus.VMR_MSL38v1.acc.csv'
 #vmr_file = 'inputs/VMR_MSL38_v1.acc.head100.csv'
 #vmr_file = 'inputs/VMR_21-221122_MSL37.acc.csv'
 #vmr_file = 'outputs/VMR_21-221122_MSL37.head100.csv'
 vmr = pd.read_csv(vmr_file)
 #basename = "ictv-h100"
-#basename = "ictv"
-basename = "ictv-spumavirus"
+basename = "vmr_MSL38_v1"
+#basename = "ictv-spumavirus"
 
 null_list = ["", np.nan]
 ACCESSIONS = [a for a in vmr['GenBank Assembly ID'] if a and a not in null_list] # don't keep "" entries

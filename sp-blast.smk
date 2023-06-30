@@ -4,19 +4,28 @@ import csv
 db_dir = "output.vmr"
 out_dir = "output.spillover-blast"
 logdir = os.path.join(out_dir, 'logs')
-basename="sfv"
-db_basename = "ictv-spumavirus"
 
-# test simian foamy virus
-sm_file = 'inputs/simian-foamy.spillover.csv'
-sm = pd.read_csv(sm_file)
-ACCS = sm['AccessionNumber']
+
+
 # get genome filenames
 fromfile = 'output.spillover/spillover.fromfile.csv'
 ff = pd.read_csv(fromfile)
 ff['ident'] = ff['name'].str.split(' ', expand=True)[0]
+dna_acc = sp["ident"][sp["genome_filename"].notnull()].tolist()
 PROT_EXISTS = ff[~ff['protein_filename'].isna()]['ident']
 ff.set_index('ident', inplace=True)
+
+# full set
+basename = 'spillover'
+db_basename = 'ictv'
+ACCS = dna_acc
+
+# test simian foamy virus
+basename="sfv"
+db_basename = "ictv-spumavirus"
+sm_file = 'inputs/simian-foamy.spillover.csv'
+sm = pd.read_csv(sm_file)
+ACCS = sm['AccessionNumber']
 
 
 # ictv taxonomy

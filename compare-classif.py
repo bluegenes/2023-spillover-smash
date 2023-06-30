@@ -4,9 +4,8 @@ blast_file = 'sfv-x-ictv-spumavirus.best.tsv'
 gDF = pd.read_csv(gather_file, sep = ',')
 bDF = pd.read_csv(blast_file, sep = '\t')
 bDF.rename(columns = {'qseqid': 'ident', 'taxonomy': 'blast_lineage'}, inplace=True)
-bDF['blast_lineage'] = bDF['blast_lineage'].str.rsplit(';', n=1, expand=True)[0]
+#bDF['blast_lineage'] = bDF['blast_lineage'].str.rsplit(';', n=1, expand=True)[0]# split virus name from blast (we don't have in gather)
 blastn = bDF.loc[bDF['source'] == 'blastn']
-# split virus name from blast (we don't have in gather)
 
 
 gDF['lineage'] = 'Viruses;' + gDF['lineage']
@@ -17,8 +16,8 @@ cDF = blastn.merge(gDF, on='ident', how='left')
 
 cDF.to_csv('spillover.classif-combined.csv', index=False)
 
-# count number with same lineage
-cDF[['blast_lineage', 'gather-k31-lineage']]
-count = sum(cDF['blast_lineage'] == cDF['gather-k31-lineage'])
-print(count)
-cDF['blast_lineage'][0]
+# count number with same lineage --> not here anymore; keep lienage name
+#cDF[['blast_lineage', 'gather-k31-lineage']]
+#count = sum(cDF['blast_lineage'] == cDF['gather-k31-lineage'])
+#print(count)
+#cDF['blast_lineage'][0]
