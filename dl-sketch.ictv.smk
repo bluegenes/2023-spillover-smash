@@ -7,6 +7,7 @@ logs_dir = os.path.join(out_dir, 'logs')
 
 
 vmr_file = 'inputs/VMR_MSL38_v1.acc.csv'
+TAX_FILE= 'inputs/VMR_MSL38_v1.taxonomy.csv'
 #vmr_file = 'inputs/spumavirus.VMR_MSL38v1.acc.csv'
 #vmr_file = 'inputs/VMR_MSL38_v1.acc.head100.csv'
 #vmr_file = 'inputs/VMR_21-221122_MSL37.acc.csv'
@@ -240,4 +241,53 @@ rule build_prot_index:
         """
         diamond makedb --in {input.fasta} --db {output.index} --quiet 2> {log}
         """
+
+
+rule build_prot_taxonomy:
+    input:
+        fromfile=os.path.join(out_dir, "{basename}.fromfile.csv"),
+        fastas=ancient(Checkpoint_MakePattern("{fn}")),
+        taxonomy=TAX_FILE,
+    output:
+        prot_tax = os.path.join(out_dir, '{basename}.prot-acc.taxonomy.csv'), #columns prot_name, dna_acc, full_lineage
+    run:
+        # open fromfile
+        import screed
+        
+        # build dna acc --> lineage dict
+        dna_acc2lineage = {}
+        with open(str(input.taxonomy)) as csvfile:
+            r = csv.DictReader(csvfile)  # fields  ['ident', 'superkingdom', 'realm', 'subrealm', 'kingdom', 'subkingdom', 'phylum', \
+                                                #    'subphylum', 'class', 'subclass', 'order', 'suborder', \
+                                                #    'family', 'subfamily', 'genus', 'subgenus', 'species', \
+                                                #    'exemplar_or_additional', 'name']
+            for row in r:
+                # rename ident to dna_acc
+                row.rename(columns={'ident': 'dna_acc'}, inplace=True)
+                dna_acc2lineage[row['dna_acc']] = row
+
+        with open(str(output.prot_tax), "a") as outF:
+            header = ['ident', 'protein_name', 'dna_acc', 'superkingdom', \
+                      'realm', 'subrealm', 'kingdom', 'subkingdom', 'phylum', \
+                      'subphylum', 'class', 'subclass', 'order', 'suborder', \
+                      'family', 'subfamily', 'genus', 'subgenus', 'species', \
+                      'exemplar_or_additional', 'name']
+            # open dictwriter and write header
+            w = csv.DictWriter(outF, fieldnames=header)
+            # grab info from each protein file
+            with open(str(input.fromfile)) as csvfile:
+                r = csv.DictReader(csvfile) # fields: ["name", "genome_filename", "protein_filename"]
+                for row in r:
+                    # get the dna assembly accession
+                    if row["protein_file"]:
+                        dna_acc = row['name'].split(' ')[0]
+                        lineageInfo = dna_acc2lineage[dna_acc]
+                        # open protein file with screed and grab the name of each fasta entry
+                        with screed.open(str(row["protein_filename"])) as protF:
+                            for record in protF:
+                                prot_name = record.name
+                                # get the prot accession from the protein name
+                                prot_acc = prot_name.split(" ")[0]
+                                # write to output file
+                                w.writerow({"ident": prot_acc, "protein_name": prot_name, **lineageInfo})
 
