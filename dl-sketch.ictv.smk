@@ -7,7 +7,6 @@ logs_dir = os.path.join(out_dir, 'logs')
 
 
 vmr_file = 'inputs/VMR_MSL38_v1.acc.csv'
-TAX_FILE= 'inputs/VMR_MSL38_v1.taxonomy.csv'
 #vmr_file = 'inputs/spumavirus.VMR_MSL38v1.acc.csv'
 #vmr_file = 'inputs/VMR_MSL38_v1.acc.head100.csv'
 #vmr_file = 'inputs/VMR_21-221122_MSL37.acc.csv'
@@ -52,6 +51,8 @@ rule all:
         expand(os.path.join(out_dir, f"{basename}.{{moltype}}.zip"), moltype = ['dna', 'protein']),
         expand(os.path.join(out_dir, "blast", f"{basename}.dna.index.nhr")),
         expand(os.path.join(out_dir, "diamond", f"{basename}.protein.fa.gz.dmnd")),
+        os.path.join(out_dir, '{basename}.taxonomy.csv'),
+        os.path.join(out_dir, '{basename}.prot-acc.taxonomy.csv'),
 
 ### Rules for ICTV GenBank Assemblies:
 # download genbank genome details; make an info.csv file for entry.
@@ -243,11 +244,34 @@ rule build_prot_index:
         """
 
 
+rule build_dna_taxonomy:
+    input:
+        vma_acc = vmr_file,
+    output:
+        dna_tax = os.path.join(out_dir, '{basename}.taxonomy.csv')
+    run:
+        vmr = pd.read_csv(input.vmr_file)
+        vmr = vmr.rename(columns={'GenBank Assembly ID':'ident', 'Virus name(s)': 'name', 'Exemplar or additional isolate': 'exemplar_or_additional'})
+        print(vmr.shape)
+        vmr = vmr.dropna(subset=['ident'])
+        vmr = vmr.drop_duplicates(subset=['ident']) #only keep first
+        print(vmr.shape)
+        vmr.set_index('ident', inplace=True)
+        vmr['superkingdom'] = 'Viruses'
+        tax_columns = ['superkingdom', 'Realm', 'Subrealm', 'Kingdom', 'Subkingdom', 'Phylum', \
+                    'Subphylum', 'Class', 'Subclass', 'Order', 'Suborder', \
+                    'Family', 'Subfamily', 'Genus', 'Subgenus', 'Species', \
+                    'exemplar_or_additional', 'name']
+        tax_info = vmr[tax_columns]
+        tax_info = tax_info.rename(columns=str.lower) # lowercase all names
+        tax_info.to_csv(output.dna_tax)
+
+
 rule build_prot_taxonomy:
     input:
         fromfile=os.path.join(out_dir, "{basename}.fromfile.csv"),
         fastas=ancient(Checkpoint_MakePattern("{fn}")),
-        taxonomy=TAX_FILE,
+        taxonomy = os.path.join(out_dir, '{basename}.taxonomy.csv'),
     output:
         prot_tax = os.path.join(out_dir, '{basename}.prot-acc.taxonomy.csv'), #columns prot_name, dna_acc, full_lineage
     run:
