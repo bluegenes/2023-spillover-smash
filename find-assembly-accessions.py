@@ -123,7 +123,7 @@ def find_assembly_accessions(row):
     genbank_assembly_id, genbank_failures = retrieve_acc(row["Virus GENBANK accession"])
     # Add the assembly IDs to the row
     row["GenBank Assembly ID"] = genbank_assembly_id
-    row["GenBank Failures"] = ",".join(genbank_failures)
+    row["GenBank Failures"] = ";".join(genbank_failures)
     # we _could_ search these too, but datasets accession should be identical except for GCF/GCA difference
     #refseq_assembly_id, refseq_failures = retrieve_acc(row["Virus REFSEQ accession"])
     #row["RefSeq Assembly ID"] = refseq_assembly_id
@@ -133,19 +133,22 @@ def find_assembly_accessions(row):
 
 def main(args):
     # if we have excel format, convert using pandas
-    csv_file = args.input_csv
-    if csv_file.endswith('xlsx'):
+    input_vmr = args.input_vmr
+    if input_vmr.endswith('xlsx'):
         import pandas as pd
-        # VMR Reference file, v37
-        vmr = pd.read_excel(csv_file, sheet_name=args.sheet_name)
-        csv_file = args.input_csv.split('xlsx')[0] + 'csv'
-        vmr.to_csv(csv_file, index=False)
+        # ICTV VMR Reference file
+        vmr = pd.read_excel(input_vmr, sheet_name=args.sheet_name)
+        vmr_tsv = args.input_vmr.split('xlsx')[0] + 'tsv'
+        vmr.to_csv(vmr_tsv, index=False, sep='\t') # there are commas in some columns, so use tab
+        if args.only_convert:
+            sys.exit(0)
+        input_vmr = vmr_tsv
 
-    # read in the file with csv, loop through to link to assembly dataset information
-    with open(csv_file, 'r') as inF, open(args.output_csv, 'w', newline='') as out_csv:
-        reader = csv.DictReader(inF)
+    # read in the file with tsv, loop through to link to assembly dataset information
+    with open(input_vmr, 'r') as inF, open(args.output_vmr, 'w', newline='') as out_acc:
+        reader = csv.DictReader(inF, delimiter='\t')
         fieldnames = reader.fieldnames + ["GenBank Assembly ID", "GenBank Failures"]#, "RefSeq Assembly ID", "RefSeq Failures"]
-        writer = csv.DictWriter(out_csv, fieldnames=fieldnames)
+        writer = csv.DictWriter(out_acc, fieldnames=fieldnames, delimiter='\t') # there are commas in some columns, so use tab
         writer.writeheader()
         for n, row in enumerate(reader):
             if n % 500 == 0:
@@ -156,9 +159,10 @@ def main(args):
 def cmdline(sys_args):
     "Command line entry point w/argparse action."
     p = argparse.ArgumentParser()
-    p.add_argument("-i", "--input-csv", default= "inputs/VMR_MSL38_v1.csv")
-    p.add_argument("-o", "--output-csv", default='inputs/VMR_MSL38_v1.acc.csv')
+    p.add_argument("-i", "--input-vmr", default= "inputs/VMR_MSL38_v1.xlsx")
+    p.add_argument("-o", "--output-vmr", default='inputs/VMR_MSL38_v1.acc.csv')
     p.add_argument("-s", "--sheet-name", default='VMR MSL38 v1')
+    p.add_argument("-c", "--only-convert", action='store_true', default=False, help="Only convert excel to tsv, then exit.")
     args = p.parse_args()
     return main(args)
 
