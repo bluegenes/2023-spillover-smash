@@ -11,21 +11,21 @@ logdir = os.path.join(out_dir, 'logs')
 fromfile = 'output.spillover/spillover.fromfile.csv'
 ff = pd.read_csv(fromfile)
 ff['ident'] = ff['name'].str.split(' ', expand=True)[0]
-dna_acc = sp["ident"][sp["genome_filename"].notnull()].tolist()
+dna_acc = ff["ident"][ff["genome_filename"].notnull()].tolist()
 PROT_EXISTS = ff[~ff['protein_filename'].isna()]['ident']
 ff.set_index('ident', inplace=True)
 
 # full set
 basename = 'spillover'
-db_basename = 'ictv'
+db_basename = 'vmr_MSL38_v1'
 ACCS = dna_acc
 
 # test simian foamy virus
-basename="sfv"
-db_basename = "ictv-spumavirus"
-sm_file = 'inputs/simian-foamy.spillover.csv'
-sm = pd.read_csv(sm_file)
-ACCS = sm['AccessionNumber']
+#basename="sfv"
+#db_basename = "ictv-spumavirus"
+#sm_file = 'inputs/simian-foamy.spillover.csv'
+#sm = pd.read_csv(sm_file)
+#ACCS = sm['AccessionNumber']
 
 
 # ictv taxonomy
@@ -79,6 +79,10 @@ rule blastn:
     benchmark: os.path.join(logdir, 'blastn', "{acc}-x-{db_basename}.blastn.benchmark")
     conda: "conf/env/blast.yml"
     threads: 4
+    resources:
+        mem_mb=lambda wildcards, attempt: attempt *6000,
+        time=240,
+        partition="bml",
     shell:
         """
         zcat {input.query} | blastn -query - -db {params.index_basename} \
@@ -98,6 +102,10 @@ rule diamond_blastx:
     log: os.path.join(logdir, 'diamond', "{acc}-x-{db_basename}.diamond-blastx.log")
     benchmark: os.path.join(logdir, 'diamond', "{acc}-x-{db_basename}.diamond-blastx.benchmark")
     threads: 4
+    resources:
+        mem_mb=lambda wildcards, attempt: attempt *5000,
+        time=240,
+        partition="low2",
     shell:
         """
         diamond blastx --query {input.query} --db {input.index} \
@@ -116,6 +124,10 @@ rule diamond_blastp:
     log: os.path.join(logdir, 'diamond', "{acc}-x-{db_basename}.diamond-blastp.log")
     benchmark: os.path.join(logdir, 'diamond', "{acc}-x-{db_basename}.diamond-blastp.benchmark")
     threads: 4
+    resources:
+        mem_mb=lambda wildcards, attempt: attempt *5000,
+        time=240,
+        partition="low2",
     shell:
         """
         diamond blastp --query {input.query} --db {input.index} \
@@ -128,6 +140,10 @@ rule aggregate_blastn:
         cl = lambda w: expand(os.path.join(out_dir, 'blast', "{acc}-x-{db_basename}.blast.txt"), acc = ACCS, db_basename=db_basename),
     output:
         os.path.join(out_dir, "{basename}-x-{db_basename}.blast.tsv")
+    resources:
+        mem_mb=lambda wildcards, attempt: attempt *5000,
+        time=240,
+        partition="low2",
     run:
         with open(str(output), 'w') as outF:
             w = csv.writer(outF, delimiter='\t')
@@ -162,6 +178,10 @@ rule aggregate_blastx:
         cl = lambda w: expand(os.path.join(out_dir, 'diamond', "{acc}-x-{db_basename}.diamond-blastx.txt"), acc = ACCS, db_basename=db_basename),
     output:
         os.path.join(out_dir, "{basename}-x-{db_basename}.diamond-blastx.tsv"),
+    resources:
+        mem_mb=lambda wildcards, attempt: attempt *5000,
+        time=240,
+        partition="low2",
     run:
         with open(str(output), 'w') as outF:
             w = csv.writer(outF, delimiter='\t')
@@ -186,6 +206,7 @@ rule aggregate_blastx:
             for e in empties:
                 w.writerow(e)
 
+localrules: select_besthits
 rule select_besthits:
     input:
         blastx = os.path.join(out_dir, "{basename}-x-{db_basename}.diamond-blastx.tsv"),
