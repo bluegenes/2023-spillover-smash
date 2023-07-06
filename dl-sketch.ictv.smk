@@ -51,8 +51,8 @@ rule all:
         expand(os.path.join(out_dir, f"{basename}.{{moltype}}.zip"), moltype = ['dna', 'protein']),
         expand(os.path.join(out_dir, "blast", f"{basename}.dna.index.nhr")),
         expand(os.path.join(out_dir, "diamond", f"{basename}.protein.fa.gz.dmnd")),
-        os.path.join(out_dir, '{basename}.taxonomy.csv'),
-        os.path.join(out_dir, '{basename}.prot-acc.taxonomy.csv'),
+        os.path.join(out_dir, f'{basename}.taxonomy.csv'),
+        os.path.join(out_dir, f'{basename}.protein-taxonomy.csv'),
 
 ### Rules for ICTV GenBank Assemblies:
 # download genbank genome details; make an info.csv file for entry.
@@ -246,7 +246,7 @@ rule build_prot_index:
 
 rule build_dna_taxonomy:
     input:
-        vma_acc = vmr_file,
+        vmr_file = vmr_file,
     output:
         dna_tax = os.path.join(out_dir, '{basename}.taxonomy.csv')
     run:
@@ -273,7 +273,7 @@ rule build_prot_taxonomy:
         fastas=ancient(Checkpoint_MakePattern("{fn}")),
         taxonomy = os.path.join(out_dir, '{basename}.taxonomy.csv'),
     output:
-        prot_tax = os.path.join(out_dir, '{basename}.prot-acc.taxonomy.csv'), #columns prot_name, dna_acc, full_lineage
+        prot_tax = os.path.join(out_dir, '{basename}.protein-taxonomy.csv'), #columns prot_name, dna_acc, full_lineage
     run:
         # open fromfile
         import screed
@@ -287,7 +287,8 @@ rule build_prot_taxonomy:
                                                 #    'exemplar_or_additional', 'name']
             for row in r:
                 # rename ident to dna_acc
-                row.rename(columns={'ident': 'dna_acc'}, inplace=True)
+                row['dna_acc'] = row['ident']
+                row.pop('ident')
                 dna_acc2lineage[row['dna_acc']] = row
 
         with open(str(output.prot_tax), "a") as outF:
