@@ -160,7 +160,7 @@ def cmdline(sys_args):
     "Command line entry point w/argparse action."
     p = argparse.ArgumentParser()
     p.add_argument("-i", "--input-vmr", default= "inputs/VMR_MSL38_v1.xlsx")
-    p.add_argument("-o", "--output-vmr", default='inputs/VMR_MSL38_v1.acc.csv')
+    p.add_argument("-o", "--output-vmr", default='inputs/VMR_MSL38_v1.acc.tsv')
     p.add_argument("-s", "--sheet-name", default='VMR MSL38 v1')
     p.add_argument("-c", "--only-convert", action='store_true', default=False, help="Only convert excel to tsv, then exit.")
     args = p.parse_args()
