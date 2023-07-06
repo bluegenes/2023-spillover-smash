@@ -61,11 +61,11 @@ onerror:
 rule all:
     input:
         expand(os.path.join(out_dir, 'blast', "{acc}-x-{db_basename}.blast.txt"), acc = ACCS ,db_basename=db_basename),
-        expand(os.path.join(out_dir, 'diamond', "{acc}-x-{db_basename}.diamond-blastx.txt"), acc = ACCS, db_basename=db_basename), 
-        os.path.join(out_dir, f"{basename}-x-{db_basename}.blast.tsv"),
-        os.path.join(out_dir, f"{basename}-x-{db_basename}.diamond-blastx.tsv"),
-#        os.path.join(out_dir, f"{basename}-x-{db_basename}.best.tsv"),
+        #expand(os.path.join(out_dir, 'diamond', "{acc}-x-{db_basename}.diamond-blastx.txt"), acc = ACCS, db_basename=db_basename), 
         expand(os.path.join(out_dir, f"{basename}-x-{db_basename}.{{searchtype}}.best.tsv"), searchtype = ['blastn']), # diamond-blastx
+        #os.path.join(out_dir, f"{basename}-x-{db_basename}.blast.tsv"),
+        #os.path.join(out_dir, f"{basename}-x-{db_basename}.diamond-blastx.tsv"),
+#        os.path.join(out_dir, f"{basename}-x-{db_basename}.best.tsv"),
 #        os.path.join(out_dir, f"{basename}-x-{db_basename}.blast.best.tsv"),
 
 rule blastn:
@@ -140,7 +140,7 @@ rule aggregate_blastn:
     input:
         cl = lambda w: expand(os.path.join(out_dir, 'blast', "{acc}-x-{db_basename}.blast.txt"), acc = ACCS, db_basename=db_basename),
     output:
-        os.path.join(out_dir, "{basename}-x-{db_basename}.blast.tsv")
+        os.path.join(out_dir, "{basename}-x-{db_basename}.blastn.tsv")
     resources:
         mem_mb=lambda wildcards, attempt: attempt *5000,
         time=240,
