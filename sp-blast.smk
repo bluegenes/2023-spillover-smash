@@ -62,7 +62,7 @@ rule all:
     input:
         expand(os.path.join(out_dir, 'blast', "{acc}-x-{db_basename}.blast.txt"), acc = ACCS ,db_basename=db_basename),
         #expand(os.path.join(out_dir, 'diamond', "{acc}-x-{db_basename}.diamond-blastx.txt"), acc = ACCS, db_basename=db_basename), 
-        expand(os.path.join(out_dir, f"{basename}-x-{db_basename}.{{searchtype}}.best.tsv"), searchtype = ['blastn']), # diamond-blastx
+        expand(os.path.join(out_dir, f"{basename}-x-{db_basename}.{{searchtype}}.best.tsv"), searchtype = ['blastn'], end = ['best', 'info']), # diamond-blastx
         #os.path.join(out_dir, f"{basename}-x-{db_basename}.blast.tsv"),
         #os.path.join(out_dir, f"{basename}-x-{db_basename}.diamond-blastx.tsv"),
 #        os.path.join(out_dir, f"{basename}-x-{db_basename}.best.tsv"),
@@ -229,3 +229,17 @@ rule select_besthits:
         # select best per df
         best = select_best_hits(blast_df)
         best.to_csv(output.best, sep='\t', index=False)
+
+
+rule add_spillover_info:
+    input:
+        blast = os.path.join(out_dir, "{basename}-x-{db_basename}.{searchtype}.tsv"),
+        spillover_info = '../inputs/2023-03-27_spillover_accession-numers.csv',
+    output:
+        spillover_classif = os.path.join("{basename}-x-{db_basename}.{searchtype}.info.tsv")
+    conda: 'conf/env/reports.yml'
+    shell:
+        """
+        python agg-info.py --info input.spillover_info --blast input.blast --output {output}
+        """
+    
