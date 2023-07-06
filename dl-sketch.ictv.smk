@@ -7,13 +7,18 @@ logs_dir = os.path.join(out_dir, 'logs')
 
 
 vmr_file = 'inputs/VMR_MSL38_v1.acc.csv'
+vmr = pd.read_csv(vmr_file)
+#vmr_file = 'inputs/VMR_MSL38_v1.acc.tsv'
+#vmr = pd.read_csv(vmr_file, sep='\t')
+basename = "vmr_MSL38_v1"
+
+
+# subsets and tests
 #vmr_file = 'inputs/spumavirus.VMR_MSL38v1.acc.csv'
 #vmr_file = 'inputs/VMR_MSL38_v1.acc.head100.csv'
 #vmr_file = 'inputs/VMR_21-221122_MSL37.acc.csv'
 #vmr_file = 'outputs/VMR_21-221122_MSL37.head100.csv'
-vmr = pd.read_csv(vmr_file)
 #basename = "ictv-h100"
-basename = "vmr_MSL38_v1"
 #basename = "ictv-spumavirus"
 
 null_list = ["", np.nan]
@@ -304,7 +309,7 @@ rule build_prot_taxonomy:
                 r = csv.DictReader(csvfile) # fields: ["name", "genome_filename", "protein_filename"]
                 for row in r:
                     # get the dna assembly accession
-                    if row["protein_file"]:
+                    if row["protein_filename"]:
                         dna_acc = row['name'].split(' ')[0]
                         lineageInfo = dna_acc2lineage[dna_acc]
                         # open protein file with screed and grab the name of each fasta entry
