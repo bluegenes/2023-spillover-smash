@@ -65,9 +65,7 @@ rule all:
         os.path.join(out_dir, f"{basename}-x-{db_basename}.blast.tsv"),
         os.path.join(out_dir, f"{basename}-x-{db_basename}.diamond-blastx.tsv"),
 #        os.path.join(out_dir, f"{basename}-x-{db_basename}.best.tsv"),
-        blastn=os.path.join(out_dir, f"{basename}-x-{db_basename}.blastn.best.tsv"),
-        blastx=os.path.join(out_dir, f"{basename}-x-{db_basename}.diamond-blastx.best.tsv"),
-
+        expand(os.path.join(out_dir, f"{basename}-x-{db_basename}.{{searchtype}}.best.tsv"), searchtype = ['blastn']), # diamond-blastx
 #        os.path.join(out_dir, f"{basename}-x-{db_basename}.blast.best.tsv"),
 
 rule blastn:
@@ -209,37 +207,25 @@ rule aggregate_blastx:
             for e in empties:
                 w.writerow(e)
 
+
 localrules: select_besthits
 rule select_besthits:
     input:
-        blastx = os.path.join(out_dir, "{basename}-x-{db_basename}.diamond-blastx.tsv"),
-        blastn = os.path.join(out_dir, "{basename}-x-{db_basename}.blast.tsv"),
+        blast = os.path.join(out_dir, "{basename}-x-{db_basename}.{searchtype}.tsv"),
     output:
-        blastn=os.path.join(out_dir, "{basename}-x-{db_basename}.blastn.best.tsv"),
-        blastx=os.path.join(out_dir, "{basename}-x-{db_basename}.diamond-blastx.best.tsv"),
+        best = os.path.join(out_dir, "{basename}-x-{db_basename}.{searchtype}.best.tsv"),
     run:
         def select_best_hits(df):
             return df.dropna(subset=['bitscore']).groupby(['qseqid', 'source']).apply(lambda x: x.loc[x['bitscore'].idxmax()]).reset_index(drop=True)
         
-        blastn_file = input.blastn
-        blastx_file = input.blastx
+        blast_file = input.blast
         
         # Read the blastn and blastx files into DataFrames
-        blastn_df = pd.read_csv(blastn_file, sep='\t')
-        blastx_df = pd.read_csv(blastx_file, sep='\t')
+        blast_df = pd.read_csv(blast_file, sep='\t')
         
         # Add an additional column to indicate the source (blastn or blastx)
-        blastn_df['source'] = 'blastn'
-        blastx_df['source'] = 'blastx'
+        blast_df['source'] = wildcards.searchtype
         
         # select best per df
-        bn_best = select_best_hits(blastn_df)
-        bn_best.to_csv(output.blastn, sep='\t', index=False)
-        bx_best = select_best_hits(blastx_df)
-        bx_best.to_csv(output.blastx, sep='\t', index=False)
-        # Combine the blastn and blastx DataFrames
-     #   combined_df = pd.concat([blastn_df, blastx_df])
-        # Select rows with the maximum bit score per qseqid
-        #best_hits_df = select_best_hits(combined_df)
-        # Write the best hits to the output file
-        #best_hits_df.to_csv(output.combined, sep='\t', index=False)
+        best = select_best_hits(blast_df)
+        best.to_csv(output.best, sep='\t', index=False)
