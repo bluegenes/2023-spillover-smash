@@ -1,6 +1,8 @@
+import sys
+import argparse
 import sourmash
 import pandas as pd
-import numpy as np 
+import numpy as np
 
 from sourmash.tax.tax_utils import ICTVRankLineageInfo
 
@@ -15,12 +17,12 @@ def make_ICTVLineageInfo(row, column='blast_lineage'):
     return lineage
 
 # extract lineage to columns
-def lin_to_cols(row, column='blast_linfo', ranks_to_keep = ['name','species', 'genus', 'family']):
+def lin_to_cols(row, column='blast_linfo', ranks_to_keep = ['name', 'species', 'genus', 'family']):
     prefix = 'blast_vmr_'
     if 'gather' in column:
         prefix = 'gather_vmr_'
     lin = row[column]
-    lin_dict = {prefix + a.rank: a.name for a in lin.lineage}
+    lin_dict = {prefix + a.rank: a.name for a in lin.lineage if a.rank} # drops a few common names
     for k, v in lin_dict.items():
         if k.split(prefix)[1] in ranks_to_keep:
             row[k] = v
@@ -29,11 +31,11 @@ def lin_to_cols(row, column='blast_linfo', ranks_to_keep = ['name','species', 'g
 
 def main(args):
     # read in metadata info
-    sDF = pd.read_csv(args.info)
+    sDF = pd.read_csv(args.info, index_col= 0)
     blastDF = pd.read_csv(args.blast, sep = '\t')
 
     # make sourmash taxonomy out of lineage
-    blastDF['blast_linfo'] = cDF.apply(make_ICTVLineageInfo, axis=1, column='taxonomy')
+    blastDF['blast_linfo'] = blastDF.apply(make_ICTVLineageInfo, axis=1, column='taxonomy')
     blastDF = blastDF.apply(lin_to_cols, axis=1, column='blast_linfo')
 
     merged = sDF.merge(blastDF, right_on='qseqid', left_on='AccessionNumber', how='left') # 'left' to keep all spillover accessions
