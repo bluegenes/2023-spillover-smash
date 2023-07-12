@@ -6,14 +6,18 @@ out_dir = "output.vmr"
 logs_dir = os.path.join(out_dir, 'logs')
 
 
-vmr_file = 'inputs/VMR_MSL38_v1.acc.csv'
-vmr = pd.read_csv(vmr_file)
-#vmr_file = 'inputs/VMR_MSL38_v1.acc.tsv'
-#vmr = pd.read_csv(vmr_file, sep='\t')
 basename = "vmr_MSL38_v1"
+#vmr_file = 'inputs/VMR_MSL38_v1.acc.csv'
+#vmr = pd.read_csv(vmr_file)
+vmr_file = 'inputs/VMR_MSL38_v1.acc.tsv'
+vmr = pd.read_csv(vmr_file, sep='\t')
 
+suppressed_records = ['GCF_002987915.1', 'GCF_002830945.1', 'GCF_002828705.1', 'GCA_004789135.1']
 
 # subsets and tests
+#vmr_file = 'inputs/VMR_MSL38_v1.lassa.tsv'
+#vmr = pd.read_csv(vmr_file, sep='\t')
+#basename = "vmr_MSL38_v1.lassa"
 #vmr_file = 'inputs/spumavirus.VMR_MSL38v1.acc.csv'
 #vmr_file = 'inputs/VMR_MSL38_v1.acc.head100.csv'
 #vmr_file = 'inputs/VMR_21-221122_MSL37.acc.csv'
@@ -21,7 +25,7 @@ basename = "vmr_MSL38_v1"
 #basename = "ictv-h100"
 #basename = "ictv-spumavirus"
 
-null_list = ["", np.nan]
+null_list = ["", np.nan] + suppressed_records
 ACCESSIONS = [a for a in vmr['GenBank Assembly ID'] if a and a not in null_list] # don't keep "" entries
 # print(ACCESSIONS)
 
@@ -63,7 +67,7 @@ rule all:
 # download genbank genome details; make an info.csv file for entry.
 rule make_genome_info_csv:
     output:
-        csvfile = 'genbank/info/{acc}.info.csv'
+        csvfile = 'genbank/info/{acc}.info.csv',
     threads: 1
     resources:
         mem_mb=3000,
@@ -255,7 +259,7 @@ rule build_dna_taxonomy:
     output:
         dna_tax = os.path.join(out_dir, '{basename}.taxonomy.csv')
     run:
-        vmr = pd.read_csv(input.vmr_file)
+        vmr = pd.read_csv(input.vmr_file, sep = '\t')
         vmr = vmr.rename(columns={'GenBank Assembly ID':'ident', 'Virus name(s)': 'name', 'Exemplar or additional isolate': 'exemplar_or_additional'})
         print(vmr.shape)
         vmr = vmr.dropna(subset=['ident'])

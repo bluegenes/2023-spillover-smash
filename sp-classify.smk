@@ -17,10 +17,10 @@ prot_acc = [n.split(' ')[0] for n in prot_names]
 
 
 # test simian foamy virus
-sm_file = 'inputs/simian-foamy.spillover.csv'
-basename = "spumavirus"
-sm = pd.read_csv(sm_file)
-dna_acc = sm['AccessionNumber']
+#sm_file = 'inputs/simian-foamy.spillover.csv'
+#basename = "spumavirus"
+#sm = pd.read_csv(sm_file)
+#dna_acc = sm['AccessionNumber']
 
 
 # search_databases = config['search_databases'] # must be dictionary
@@ -29,7 +29,8 @@ ksize = config.get("ksize", [21, 31])
 if not isinstance(ksize, list):
     ksize=[ksize]
 
-TAX_FILE = 'inputs/VMR_21-221122_MSL37.taxonomy.csv'
+#TAX_FILE = 'inputs/VMR_21-221122_MSL37.taxonomy.csv'
+TAX_FILE = 'inputs/vmr_MSL38_v1.taxonomy.csv'
 
 onstart:
     print("------------------------------")

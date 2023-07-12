@@ -1,5 +1,6 @@
 import pandas as pd
 import csv
+import numpy as np
 
 db_dir = "output.vmr"
 out_dir = "output.spillover-blast"
@@ -27,6 +28,13 @@ ACCS = dna_acc
 #sm = pd.read_csv(sm_file)
 #ACCS = sm['AccessionNumber']
 
+# test set lassa
+#basename="lassa"
+#db_basename= 'vmr_MSL38_v1.lassa'
+#sm_file  = 'inputs/lassa.spillover.csv'
+#sm = pd.read_csv(sm_file)
+#ACCS = sm['AccessionNumber']
+
 
 # ictv taxonomy
 tax_file = 'inputs/VMR_MSL38_v1.acc.csv'
@@ -40,7 +48,8 @@ ictvD = dict(zip(ictv_tax['Virus REFSEQ accession'], ictv_tax['taxonomy']))
 ictvD_gb = dict(zip(ictv_tax['Virus GENBANK accession'], ictv_tax['taxonomy']))
 ictvD.update(ictvD_gb) # add gb mappings
 
-
+null_list = ["", np.nan, 'Unknown']
+ACCS = [a for a in ACCS if a and a not in null_list] # don't keep "" entries
 
 # to do: use protein?
 #PROT_ACCS = [x for x in ACCS if x in PROT_EXISTS]
