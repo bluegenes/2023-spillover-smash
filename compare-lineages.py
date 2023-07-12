@@ -9,11 +9,12 @@ sp_csv = '../inputs/2023-03-27_spillover_accession-numers.csv'
 sDF = pd.read_csv(sp_csv)
 #sDF
 
-compare_csv =  'spillover.classif-combined.csv'
-cDF = pd.read_csv(compare_csv)
+#compare_csv =  'spillover.classif-combined.csv'
+blast_tsv = 'spillover-x-vmr_MSL38_v1.blastn.best.tsv'
+cDF = pd.read_csv(compare_tsv, sep='\t')
 
 # make ICTVLineageInfo object for each lineage
-def make_ICTVLineageInfo(row, column='blast_lineage'):
+def make_ICTVLineageInfo(row, column='taxonomy'):
     lin = row[column]
     if not isinstance(lin, str): # if nan
         return ICTVRankLineageInfo()
@@ -23,7 +24,7 @@ def make_ICTVLineageInfo(row, column='blast_lineage'):
 
 
 # make sourmash lineages
-cDF['blast_linfo'] = cDF.apply(make_ICTVLineageInfo, axis=1, column='blast_lineage')
+cDF['blast_linfo'] = cDF.apply(make_ICTVLineageInfo, axis=1, column='taxonomy') # blast_lineage
 cDF['gather-k31-linfo'] = cDF.apply(make_ICTVLineageInfo, axis=1, column='gather-k31-lineage')
 
 # find LCA
