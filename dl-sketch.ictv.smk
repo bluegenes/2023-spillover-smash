@@ -57,11 +57,11 @@ class Checkpoint_MakePattern:
 
 rule all:
     input:
-        expand(os.path.join(out_dir, f"{basename}.{{moltype}}.zip"), moltype = ['dna', 'protein']),
-        expand(os.path.join(out_dir, "blast", f"{basename}.dna.index.nhr")),
-        expand(os.path.join(out_dir, "diamond", f"{basename}.protein.fa.gz.dmnd")),
+        #expand(os.path.join(out_dir, f"{basename}.{{moltype}}.zip"), moltype = ['dna', 'protein']),
+        #expand(os.path.join(out_dir, "blast", f"{basename}.dna.index.nhr")),
+        #expand(os.path.join(out_dir, "diamond", f"{basename}.protein.fa.gz.dmnd")),
         os.path.join(out_dir, f'{basename}.taxonomy.csv'),
-        os.path.join(out_dir, f'{basename}.protein-taxonomy.csv'),
+        # os.path.join(out_dir, f'{basename}.protein-taxonomy.csv'),
 
 ### Rules for ICTV GenBank Assemblies:
 # download genbank genome details; make an info.csv file for entry.
@@ -256,72 +256,59 @@ rule build_prot_index:
 rule build_dna_taxonomy:
     input:
         vmr_file = vmr_file,
-    output:
-        dna_tax = os.path.join(out_dir, '{basename}.taxonomy.csv')
-    run:
-        vmr = pd.read_csv(input.vmr_file, sep = '\t')
-        vmr = vmr.rename(columns={'GenBank Assembly ID':'ident', 'Virus name(s)': 'name', 'Exemplar or additional isolate': 'exemplar_or_additional'})
-        print(vmr.shape)
-        vmr = vmr.dropna(subset=['ident'])
-        vmr = vmr.drop_duplicates(subset=['ident']) #only keep first
-        print(vmr.shape)
-        vmr.set_index('ident', inplace=True)
-        vmr['superkingdom'] = 'Viruses'
-        tax_columns = ['superkingdom', 'Realm', 'Subrealm', 'Kingdom', 'Subkingdom', 'Phylum', \
-                    'Subphylum', 'Class', 'Subclass', 'Order', 'Suborder', \
-                    'Family', 'Subfamily', 'Genus', 'Subgenus', 'Species', \
-                    'exemplar_or_additional', 'name']
-        tax_info = vmr[tax_columns]
-        tax_info = tax_info.rename(columns=str.lower) # lowercase all names
-        tax_info.to_csv(output.dna_tax)
-
-
-rule build_prot_taxonomy:
-    input:
         fromfile=os.path.join(out_dir, "{basename}.fromfile.csv"),
         fastas=ancient(Checkpoint_MakePattern("{fn}")),
-        taxonomy = os.path.join(out_dir, '{basename}.taxonomy.csv'),
     output:
-        prot_tax = os.path.join(out_dir, '{basename}.protein-taxonomy.csv'), #columns prot_name, dna_acc, full_lineage
+        tax = os.path.join(out_dir, '{basename}.taxonomy.csv'),
+#        prot_tax = os.path.join(out_dir, '{basename}.protein-taxonomy.csv'), #columns prot_name, dna_acc, full_lineage
     run:
-        # open fromfile
         import screed
+        # function to get accessions from fasta files
+        def get_gene_accs(fasta):
+            accs = []
+            with screed.open(fasta) as f:
+                for record in f:
+                    acc = record.name.split(" ")[0]
+                    accs.append(acc)
+            return accs
         
-        # build dna acc --> lineage dict
-        dna_acc2lineage = {}
-        with open(str(input.taxonomy)) as csvfile:
-            r = csv.DictReader(csvfile)  # fields  ['ident', 'superkingdom', 'realm', 'subrealm', 'kingdom', 'subkingdom', 'phylum', \
-                                                #    'subphylum', 'class', 'subclass', 'order', 'suborder', \
-                                                #    'family', 'subfamily', 'genus', 'subgenus', 'species', \
-                                                #    'exemplar_or_additional', 'name']
+        # collect gene idents from each genome/proteome
+        geneD = {}
+        with open(str(input.fromfile)) as csvfile:
+            r = csv.DictReader(csvfile) # fields: ["name", "genome_filename", "protein_filename"]
+            for genome_acc in suppressed_records:
+                geneD[genome_acc] = {"dna": [], "protein": []}
             for row in r:
-                # rename ident to dna_acc
-                row['dna_acc'] = row['ident']
-                row.pop('ident')
-                dna_acc2lineage[row['dna_acc']] = row
+                # get the dna assembly accession
+                gene_accs,prot_accs = [],[]
+                genome_acc = row['name'].split(' ')[0]
+                gene_accs = get_gene_accs(row["genome_filename"])
+                if row["protein_filename"]:
+                    prot_accs = get_gene_accs(row["protein_filename"])
+                geneD[genome_acc] = {"dna": gene_accs, "protein": prot_accs}
 
-        with open(str(output.prot_tax), "a") as outF:
-            header = ['ident', 'protein_name', 'dna_acc', 'superkingdom', \
-                      'realm', 'subrealm', 'kingdom', 'subkingdom', 'phylum', \
-                      'subphylum', 'class', 'subclass', 'order', 'suborder', \
-                      'family', 'subfamily', 'genus', 'subgenus', 'species', \
-                      'exemplar_or_additional', 'name']
-            # open dictwriter and write header
-            w = csv.DictWriter(outF, fieldnames=header)
-            # grab info from each protein file
-            with open(str(input.fromfile)) as csvfile:
-                r = csv.DictReader(csvfile) # fields: ["name", "genome_filename", "protein_filename"]
-                for row in r:
-                    # get the dna assembly accession
-                    if row["protein_filename"]:
-                        dna_acc = row['name'].split(' ')[0]
-                        lineageInfo = dna_acc2lineage[dna_acc]
-                        # open protein file with screed and grab the name of each fasta entry
-                        with screed.open(str(row["protein_filename"])) as protF:
-                            for record in protF:
-                                prot_name = record.name
-                                # get the prot accession from the protein name
-                                prot_acc = prot_name.split(" ")[0]
-                                # write to output file
-                                w.writerow({"ident": prot_acc, "protein_name": prot_name, **lineageInfo})
+        vmr = pd.read_csv(str(input.vmr_file), sep = '\t')
+        assembly_ident_col = 'GenBank Assembly ID'
+        genbank_ident_col = 'Virus GENBANK accession'
+        refseq_ident_col = 'Virus REFSEQ accession'
+        vmr = vmr.rename(columns={assembly_ident_col: 'ident', genbank_ident_col: 'genbank_ident', refseq_ident_col: 'refseq_ident', 'Virus name(s)': 'name', 'Exemplar or additional isolate': 'exemplar_or_additional'})
+        vmr['superkingdom'] = 'Viruses'
+        vmr = vmr.rename(columns=str.lower) # lowercase all names
+        lineage_columns = ['superkingdom', 'realm', 'subrealm', 'kingdom', 'subkingdom', 'phylum', 'subphylum', 'class', 'subclass',
+                     'order', 'suborder', 'family', 'subfamily', 'genus', 'subgenus', 'species', 'name']
+        
+        # add lineage column
+        vmr['lineage'] = vmr[lineage_columns].fillna('').apply(lambda x: ';'.join(x.astype(str)), axis=1)
+        
+        # drop any rows with null accession in ident column
+        vmr = vmr[vmr['ident'].notnull()]
+        # add gene and protein accessions as columns, but convert lists to ';'-separated strings
+        vmr['gene_accs'] = vmr['ident'].apply(lambda x: ';'.join(geneD[x]['dna']))
+        vmr['protein_accs'] = vmr['ident'].apply(lambda x: ';'.join(geneD[x]['protein']))
 
+        print(vmr.shape)
+
+        # select columns and write csvs
+        tax_columns = ['ident','genbank_ident','refseq_ident'] + lineage_columns + [ 'lineage', 'exemplar_or_additional', 'gene_accs', 'protein_accs']
+        tax_info = vmr[tax_columns]
+        tax_info.to_csv(output.tax, index=False)
