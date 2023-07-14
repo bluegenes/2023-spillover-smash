@@ -219,7 +219,7 @@ rule select_besthits:
         blast_merged.to_csv(output.all, sep='\t', index=False)
         
         # select best per df
-        best = select_best_hits(blast_df)
+        best = select_best_hits(blast_merged)
         best.to_csv(output.best, sep='\t', index=False)
         # add spillover info
         #select columns
@@ -233,22 +233,51 @@ rule combine_best:
     input:
         blastn = os.path.join(out_dir, "{basename}-x-{db_basename}.blastn.best.tsv"),
         blastx = os.path.join(out_dir, "{basename}-x-{db_basename}.diamond-blastx.best.tsv"),
+        spillover_info = 'inputs/2023-03-27_spillover_accession-numers.csv',
     output:
         besthit_classif = os.path.join(out_dir, "{basename}-x-{db_basename}.blast-classif.tsv"),
-        missed = os.path.join(out_dir, "{basename}-x-{db_basename}.missed.tsv"),
+        merged_missed = os.path.join(out_dir, "{basename}-x-{db_basename}.missed.tsv"),
+        blastn_missed = os.path.join(out_dir, "{basename}-x-{db_basename}.blastn-missed.tsv"),
     # conda: 'conf/env/reports.yml'
     run:
+        # read spillover dataframe
+        sDF = pd.read_csv(str(input.spillover_info), index_col= 0)
         # read blastn as dataframe
         blastn_df = pd.read_csv(input.blastn, sep='\t')
         # read blastx as dataframe
         blastx_df = pd.read_csv(input.blastx, sep='\t')
-        # if lineage is null in blastn, replace with lineage from blastx
-        blastn_df.loc[blastn_df['lineage'].isnull(), 'lineage'] = blastx_df['lineage']
-        # if source is null but lineage has been filled, set source to blastx
-        blastn_df.loc[blastn_df['source'].isnull() & blastn_df['lineage'].notnull(), 'source'] = 'blastx'
-        # if lineage is still null, write to missed csv
-        blastn_missed = blastn_df[blastn_df['lineage'].isnull()]
-        blastn_missed.to_csv(output.missed, sep='\t', index=False)
+        
+        
+        # merge blastn with spillover (again)
+        existing_spillover_columns = ['IndividualID', 'AccessionNumber', 'Virus', 'VirusGenus', 'VirusSpecies', 'VirusFamily', 'HostSpecies','HostGenus','HostFamily']
+        # merge the blastn_df and sDF on these columns so we get the columns with NO blast hits back
+        merged_bn = sDF.merge(blastn_df, on=existing_spillover_columns, how='left')
+        merged_bx = sDF.merge(blastx_df, on=existing_spillover_columns, how='left')
+
+        # record missing blastn
+        blastn_missed = merged_bn[merged_bn['lineage'].isnull()]
+        blastn_missed.to_csv(output.blastn_missed, sep='\t', index=False)
+
+        blastn_classif = merged_bn[merged_bn['lineage'].notnull()]
+        print(blastn_classif.shape)
+        # select rows from merged_bx where IndividualID is not in blastn_classif
+        blastx_classif = merged_bx[~merged_bx['IndividualID'].isin(blastn_classif['IndividualID'])]
+        print(blastx_classif.shape)
+
+        #merge blastn_classif and blastx_classif
+        merged = pd.concat([blastn_classif, blastx_classif])
+        print(merged.shape)
+        
+        merged_missed = merged[merged['lineage'].isnull()]
+        merged_missed.to_csv(output.merged_missed, sep='\t', index=False)
+
+        merged_classif = merged[merged['lineage'].notnull()] 
+        merged_classif.to_csv(output.besthit_classif, sep='\t', index=False)
+        # expand lineage to columns
+       lineage_columns = ['superkingdom', 'realm', 'subrealm', 'kingdom', 'subkingdom', 'phylum', 'subphylum', 'class', 'subclass', 'order', 'suborder', 'family', 'subfamily', 'genus', 'subgenus', 'species', 'name']
+        #if lineage is notnull, split on ';' and expand to columns. fill na if null
+ #       merged[lineage_columns] = merged['lineage'].apply(lambda x: x.split(';') if pd.notnull(x) else x)
 
         # write to blast-classif
-        blastn_df.to_csv(output.besthit_classif, sep='\t', index=False)
+#        merged.to_csv(output.besthit_classif, sep='\t', index=False)
+
