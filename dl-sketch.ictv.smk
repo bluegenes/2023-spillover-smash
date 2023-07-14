@@ -5,7 +5,6 @@ import numpy as np
 out_dir = "output.vmr"
 logs_dir = os.path.join(out_dir, 'logs')
 
-
 basename = "vmr_MSL38_v1"
 #vmr_file = 'inputs/VMR_MSL38_v1.acc.csv'
 #vmr = pd.read_csv(vmr_file)
@@ -60,7 +59,7 @@ rule all:
         #expand(os.path.join(out_dir, f"{basename}.{{moltype}}.zip"), moltype = ['dna', 'protein']),
         #expand(os.path.join(out_dir, "blast", f"{basename}.dna.index.nhr")),
         #expand(os.path.join(out_dir, "diamond", f"{basename}.protein.fa.gz.dmnd")),
-        os.path.join(out_dir, f'{basename}.taxonomy.csv'),
+        os.path.join(out_dir, f'{basename}.taxonomy.tsv'),
         # os.path.join(out_dir, f'{basename}.protein-taxonomy.csv'),
 
 ### Rules for ICTV GenBank Assemblies:
@@ -259,56 +258,17 @@ rule build_dna_taxonomy:
         fromfile=os.path.join(out_dir, "{basename}.fromfile.csv"),
         fastas=ancient(Checkpoint_MakePattern("{fn}")),
     output:
-        tax = os.path.join(out_dir, '{basename}.taxonomy.csv'),
+        tax = os.path.join(out_dir, '{basename}.taxonomy.tsv'),
 #        prot_tax = os.path.join(out_dir, '{basename}.protein-taxonomy.csv'), #columns prot_name, dna_acc, full_lineage
-    run:
-        import screed
-        # function to get accessions from fasta files
-        def get_gene_accs(fasta):
-            accs = []
-            with screed.open(fasta) as f:
-                for record in f:
-                    acc = record.name.split(" ")[0]
-                    accs.append(acc)
-            return accs
-        
-        # collect gene idents from each genome/proteome
-        geneD = {}
-        with open(str(input.fromfile)) as csvfile:
-            r = csv.DictReader(csvfile) # fields: ["name", "genome_filename", "protein_filename"]
-            for genome_acc in suppressed_records:
-                geneD[genome_acc] = {"dna": [], "protein": []}
-            for row in r:
-                # get the dna assembly accession
-                gene_accs,prot_accs = [],[]
-                genome_acc = row['name'].split(' ')[0]
-                gene_accs = get_gene_accs(row["genome_filename"])
-                if row["protein_filename"]:
-                    prot_accs = get_gene_accs(row["protein_filename"])
-                geneD[genome_acc] = {"dna": gene_accs, "protein": prot_accs}
-
-        vmr = pd.read_csv(str(input.vmr_file), sep = '\t')
-        assembly_ident_col = 'GenBank Assembly ID'
-        genbank_ident_col = 'Virus GENBANK accession'
-        refseq_ident_col = 'Virus REFSEQ accession'
-        vmr = vmr.rename(columns={assembly_ident_col: 'ident', genbank_ident_col: 'genbank_ident', refseq_ident_col: 'refseq_ident', 'Virus name(s)': 'name', 'Exemplar or additional isolate': 'exemplar_or_additional'})
-        vmr['superkingdom'] = 'Viruses'
-        vmr = vmr.rename(columns=str.lower) # lowercase all names
-        lineage_columns = ['superkingdom', 'realm', 'subrealm', 'kingdom', 'subkingdom', 'phylum', 'subphylum', 'class', 'subclass',
-                     'order', 'suborder', 'family', 'subfamily', 'genus', 'subgenus', 'species', 'name']
-        
-        # add lineage column
-        vmr['lineage'] = vmr[lineage_columns].fillna('').apply(lambda x: ';'.join(x.astype(str)), axis=1)
-        
-        # drop any rows with null accession in ident column
-        vmr = vmr[vmr['ident'].notnull()]
-        # add gene and protein accessions as columns, but convert lists to ';'-separated strings
-        vmr['gene_accs'] = vmr['ident'].apply(lambda x: ';'.join(geneD[x]['dna']))
-        vmr['protein_accs'] = vmr['ident'].apply(lambda x: ';'.join(geneD[x]['protein']))
-
-        print(vmr.shape)
-
-        # select columns and write csvs
-        tax_columns = ['ident','genbank_ident','refseq_ident'] + lineage_columns + [ 'lineage', 'exemplar_or_additional', 'gene_accs', 'protein_accs']
-        tax_info = vmr[tax_columns]
-        tax_info.to_csv(output.tax, index=False)
+    params:
+        suppressed_records = ' '.join(suppressed_records),
+    conda: 'conf/env/reports.yml'
+    log:  os.path.join(logs_dir, "build_taxonomy", "{basename}.log")
+    benchmark:  os.path.join(logs_dir, "build_taxonomy", "{basename}.benchmark")
+    shell:
+        """
+        python -Werror make-tax.py --vmr-tsv {input.vmr_file} \
+                                   --fromfile {input.fromfile} \
+                                   --output {output.tax} \
+                                   --suppressed-records {params.suppressed_records} 2> {log}
+        """
