@@ -6,6 +6,7 @@ import csv
 import argparse
 
 from Bio import Entrez, SeqIO
+from Bio.Seq import UndefinedSequenceError
 
 # Set your email address (required by NCBI)
 Entrez.email = "ntpierce@ucdavis.edu"
@@ -32,7 +33,12 @@ def main(args):
     # Use SeqIO to parse the record and extract the organism name and sequences
     record = SeqIO.read(handle, "genbank")
     organism_name = record.annotations["organism"]
-    nucleotide_sequence = str(record.seq)
+    try:
+        seq = str(record.seq)
+    except UndefinedSequenceError:
+        raise ValueError(f"Could not find sequence for accession {accession}: record.seq is undefined.")
+    seq = str(record.seq)
+    nucleotide_sequence = seq
     protein_sequences = []
     for feature in record.features:
         if feature.type == "CDS":
