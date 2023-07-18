@@ -132,24 +132,29 @@ rule cat_components_to_vmr_assembly:
         # read in filenames
         for inFile in input.fileinfo:
             with open(str(inFile)) as inF:
-                reader = csv.DictReader(inF)
+                reader = csv.reader(inF)
                 for row in reader:
-                    nucl.append(row['genome_filename'])
-                    prot.append(row['protein_filename'])
+                    nucl.append(row[1])
+                    prot_file = row[2]
+                    if prot_file:
+                        prot.append(prot_file)
+        print(f"nucl: {nucl}")
+        print(f"prot: {prot}")
         # combine nucl fastas
         with gzip.open(str(output.nucl), 'wt') as outF:
             for nc in nucl:
                 # write nc file to outF
-                with open(str(nc)) as inF:
-                    outF.write(inF.read())
+                with gzip.open(str(nc), 'rt') as inF:
+                    for line in inF:
+                        outF.write(line)
         if prot: #if protein fastas, combine them
             with gzip.open(str(params.prot_out), 'wt') as outF:
                 for pt in prot:
-                    with open(str(pt)) as inF:
-                        outF.write(inF.read())
+                    with gzip.open(str(pt), 'rt') as inF:
+                        for line in inF:
+                            outF.write(line)
         # write fileinfo
         with open(str(output.fileinfo), "w") as outF:
-            outF.write(f"name,genome_filename,protein_filename\n")
             if prot:
                 outF.write(f"{wildcards.vmr_acc},{output.nucl},{params.prot_out}\n")
             else:
