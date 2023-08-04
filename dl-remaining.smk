@@ -15,18 +15,11 @@ suppressed_records = ['GCF_002987915.1', 'GCF_002830945.1', 'GCF_002828705.1', '
 vmr.loc[vmr['GenBank Assembly ID'].isin(suppressed_records), 'GenBank Failures'] = 'suppressed'
 
 # vmr38_v1: retrieval failures happened for the second of two accs, meaning we still got the valid assembly accession.
-curate_info = ['suppressed', 'no_assembly', 'multiple_acc', 'parentheses']#, 'retrieval']
+# parentheses --> numbers are not the base pair ranges we actually need?
+# get working for rest first, then handle parens later
+curate_info = ['suppressed', 'no_assembly', 'multiple_acc'] #, 'parentheses']#, 'retrieval']
 # now select all rows in vmr that had a GenBank Failure
-rows_to_curate = vmr[vmr['GenBank Failures'].isin(curate_info)]
-
-# for these, try downloading assembly again
-#assembly_accs = rows_to_curate[rows_to_curate['GenBank Failures'] == 'retrieval']['GenBank Assembly ID'].tolist()
-#download_assembly = rows_to_curate[rows_to_curate['GenBank Failures'].isin(['retrieval', 'parentheses'])]['GenBank Assembly ID'].tolist()
-
-# for these cases, download the genbank accession, which should still exist. May be multiple? Cat together if need be.
-#parentheses = rows_to_curate[rows_to_curate['GenBank Failures'] == 'parentheses']
-#multiple_acc = rows_to_curate[rows_to_curate['GenBank Failures'] == 'multiple_acc']
-curate_vmr = vmr.copy()[vmr['GenBank Failures'].isin(['no_assembly', 'suppressed', 'multiple_acc', 'parentheses'])]
+curate_vmr = vmr.copy()[vmr['GenBank Failures'].isin(curate_info)]
 
 curate_vmr['VMR_Accession'] = 'VMR_MSL38_' + curate_vmr['Sort'].astype(str)
 VMR_ACCESSIONS = curate_vmr['VMR_Accession'].tolist()
@@ -51,9 +44,6 @@ vmr_to_genbank = dict(zip(curate_vmr['VMR_Accession'], curate_vmr['genbank_acces
 wildcard_constraints:
     acc = '[^/]+',
     vmr_acc = '[^/]+',
-
-
-# import pdb;pdb.set_trace()
 
 class Checkpoint_MakePattern:
     def __init__(self, pattern):
@@ -119,51 +109,19 @@ rule cat_components_to_vmr_assembly:
         prot_out=protected(os.path.join(out_dir, "curated/protein/{vmr_acc}.faa.gz")),
         #nucl=lambda w: expand(os.path.join(out_dir, "genbank/curated/nucleotide/{acc}.fna.gz"), acc=vmr_to_genbank[w.vmr_acc]),
         #prot=lambda w: expand(os.path.join(out_dir, "genbank/curated/protein/{acc}.faa.gz"), acc=vmr_to_genbank[w.vmr_acc]),
-    log: os.path.join(logs_dir, "zcat_fasta", "{vmr_acc}.log")
-    benchmark: os.path.join(logs_dir, "zcat_fasta", "{vmr_acc}.benchmark")
+    log: os.path.join(logs_dir, "curate_fasta", "{vmr_acc}.log")
+    benchmark: os.path.join(logs_dir, "curate_fasta", "{vmr_acc}.benchmark")
     threads: 1
     resources:
         mem_mb=3000,
         time=90,
-        partition="low2",
-    run:
-        import gzip
-        nucl,prot=[],[]
-        # read in filenames
-        for inFile in input.fileinfo:
-            with open(str(inFile)) as inF:
-                reader = csv.reader(inF)
-                for row in reader:
-                    nucl.append(row[1])
-                    prot_file = row[2]
-                    if prot_file:
-                        prot.append(prot_file)
-        print(f"nucl: {nucl}")
-        print(f"prot: {prot}")
-        # combine nucl fastas
-        with gzip.open(str(output.nucl), 'wt') as outF:
-            for nc in nucl:
-                # write nc file to outF
-                with gzip.open(str(nc), 'rt') as inF:
-                    for line in inF:
-                        outF.write(line)
-        if prot: #if protein fastas, combine them
-            with gzip.open(str(params.prot_out), 'wt') as outF:
-                for pt in prot:
-                    with gzip.open(str(pt), 'rt') as inF:
-                        for line in inF:
-                            outF.write(line)
-        # write fileinfo
-        with open(str(output.fileinfo), "w") as outF:
-            if prot:
-                outF.write(f"{wildcards.vmr_acc},{output.nucl},{params.prot_out}\n")
-            else:
-                outF.write(f'{wildcards.vmr_acc},{output.nucl},\n')
-
-        # """
-        # zcat {input.nucl} > {output.nucl} 2> {log}
-        # zcat {params.prot} > {output.prot} 2>> {log}
-        # """ 
+        partition="med2",
+    shell:
+        """
+        python curate-fasta.py --curated-acc {wildcards.vmr_acc} \
+                               --nucl-out {output.nucl} --prot-out {params.prot_out} \
+                               --fileinfo-out {output.fileinfo} {input.fileinfo} 2> {log}
+        """
 
 
 rule aggregate_fileinfo_to_fromfile:
