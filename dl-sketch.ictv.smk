@@ -6,12 +6,8 @@ out_dir = "output.vmr"
 logs_dir = os.path.join(out_dir, 'logs')
 
 basename = "vmr_MSL38_v1"
-#vmr_file = 'inputs/VMR_MSL38_v1.acc.csv'
-#vmr = pd.read_csv(vmr_file)
 vmr_file = 'inputs/VMR_MSL38_v1.acc.tsv'
 vmr = pd.read_csv(vmr_file, sep='\t')
-
-suppressed_records = ['GCF_002987915.1', 'GCF_002830945.1', 'GCF_002828705.1', 'GCA_004789135.1']
 
 # subsets and tests
 #vmr_file = 'inputs/VMR_MSL38_v1.lassa.tsv'
@@ -24,10 +20,46 @@ suppressed_records = ['GCF_002987915.1', 'GCF_002830945.1', 'GCF_002828705.1', '
 #basename = "ictv-h100"
 #basename = "ictv-spumavirus"
 
+suppressed_records = ['GCF_002987915.1', 'GCF_002830945.1', 'GCF_002828705.1', 'GCA_004789135.1']
+# add 'suppressed' into GenBank Failure column for these records
+vmr.loc[vmr['GenBank Assembly ID'].isin(suppressed_records), 'GenBank Failures'] = 'suppressed'
+
 null_list = ["", np.nan] + suppressed_records
 ACCESSIONS = [a for a in vmr['GenBank Assembly ID'] if a and a not in null_list] # don't keep "" entries
-# print(ACCESSIONS)
 
+########################################################################
+#### Handle VMR entries with no GenBank Assembly ID or other issues ####
+# vmr38_v1: retrieval failures happened for the second of two accs, meaning we still got the valid assembly accession.
+# parentheses --> numbers are not the base pair ranges we actually need?
+# get working for rest first, then handle parens later
+curate_info = ['suppressed', 'no_assembly', 'multiple_acc'] #, 'parentheses']#, 'retrieval']
+# now select all rows in vmr that had a GenBank Failure
+curate_vmr = vmr.copy()[vmr['GenBank Failures'].isin(curate_info)]
+
+curate_vmr['VMR_Accession'] = 'VMR_MSL38_' + curate_vmr['Sort'].astype(str)
+VMR_ACCESSIONS = curate_vmr['VMR_Accession'].tolist()
+parentheses_acc = curate_vmr[curate_vmr['GenBank Failures'] == 'parentheses']['VMR_Accession'].tolist()
+########################################################################
+
+# get clean list of genbank nucleotide accession(s)
+def clean_genbank_accs(row):
+    genbank_acc = row['Virus GENBANK accession'].split(';')
+    # check if ':' is in any and split on that
+    for i, acc in enumerate(genbank_acc):
+        if ':' in acc:
+            genbank_acc[i] = acc.split(':')[1]
+        if '(' in acc:
+            genbank_acc[i] = acc.split('(')[0]
+        genbank_acc[i] = genbank_acc[i].strip()
+    return genbank_acc
+
+curate_vmr.loc[:, 'genbank_accessions'] = curate_vmr.apply(clean_genbank_accs, axis=1)
+# get dictionary of vmr accession to genbank accession(s)
+vmr_to_genbank = dict(zip(curate_vmr['VMR_Accession'], curate_vmr['genbank_accessions']))
+
+wildcard_constraints:
+    acc = '[^/]+',
+    vmr_acc = '[^/]+',
 
 class Checkpoint_MakePattern:
     def __init__(self, pattern):
@@ -151,10 +183,60 @@ rule download_matching_proteome_wc:
                 #except:
                 #    shell('touch {output}')
 
-localrules: build_fromfile_from_assemblyinfo
-rule build_fromfile_from_assemblyinfo:
+
+rule download_genbank_accession:
+    output: 
+        nucl=protected(os.path.join(out_dir, "genbank/curated/nucleotide/{acc}.fna.gz")),
+        fileinfo=protected(os.path.join(out_dir, "genbank/curated/fileinfo/{acc}.fileinfo.csv")),
+    params:
+        prot_dir= os.path.join(out_dir, "genbank/curated/protein"),
+        prot=protected(os.path.join(out_dir, "genbank/curated/protein/{acc}.faa.gz")),
+    conda: "conf/env/biopython.yml"
+    log: os.path.join(logs_dir, "downloads", "{acc}.log")
+    benchmark: os.path.join(logs_dir, "downloads", "{acc}.benchmark")
+    threads: 1
+    resources:
+        mem_mb=3000,
+        runtime=60,
+        time=90,
+        partition="low2",
+    shell:
+        """
+        mkdir -p {params.prot_dir}
+        python genbank_nuccore.py {wildcards.acc} --nucleotide {output.nucl} --protein {params.prot} --fileinfo {output.fileinfo} 2> {log}
+        """
+
+# cat the individual fasta files (genbank accessions) into a single fasta file per vmr accession
+rule cat_components_to_vmr_assembly:
     input: 
-        info=expand("genbank/info/{acc}.info.csv", acc=ACCESSIONS)
+        fileinfo=lambda w: expand(os.path.join(out_dir, "genbank/curated/fileinfo/{acc}.fileinfo.csv"), acc=vmr_to_genbank[w.vmr_acc])
+    output:
+        nucl= protected(os.path.join(out_dir, "curated/nucleotide/{vmr_acc}.fna.gz")),
+        fileinfo= protected(os.path.join(out_dir, "curated/fileinfo/{vmr_acc}.fileinfo.csv")),
+    params:
+        prot_dir= os.path.join(out_dir, "curated/protein"),
+        prot_out=protected(os.path.join(out_dir, "curated/protein/{vmr_acc}.faa.gz")),
+    log: os.path.join(logs_dir, "curate_fasta", "{vmr_acc}.log")
+    benchmark: os.path.join(logs_dir, "curate_fasta", "{vmr_acc}.benchmark")
+    threads: 1
+    resources:
+        mem_mb=3000,
+        time=90,
+        partition="med2",
+    shell:
+        """
+        mkdir -p {params.prot_dir}
+        python curate-fasta.py --input-fileinfo {input.fileinfo} --curated-acc {wildcards.vmr_acc} \
+                               --nucl-out {output.nucl} --prot-out {params.prot_out} \
+                               --fileinfo-out {output.fileinfo} 2> {log}
+        """
+
+
+localrules: build_fromfile_from_assemblyinfo
+rule build_fromfile_from_assemblyinfo: # include curated fileinfo
+    input: 
+        info=expand("genbank/info/{acc}.info.csv", acc=ACCESSIONS),
+        curated=expand(os.path.join(out_dir, "curated/fileinfo/{acc}.fileinfo.csv"), acc=VMR_ACCESSIONS),
     output:
         csv = os.path.join(out_dir, "{basename}.fromfile.csv")
     threads: 1
@@ -162,7 +244,7 @@ rule build_fromfile_from_assemblyinfo:
         with open(str(output.csv), "w") as outF:
             header = ["name","genome_filename","protein_filename"]
             outF.write(','.join(header) + '\n')
-            for inp in input:
+            for inp in input.info:
                 with open(str(inp)) as csvfile:
                     csv_reader = csv.DictReader(csvfile)# .# has fields:  ["acc", "genome_url", "protein_url", "assembly_report_url", "ncbi_tax_name", "ncbi_taxid"]
                     rows = list(csv_reader)
@@ -176,6 +258,9 @@ rule build_fromfile_from_assemblyinfo:
                         # do we want to add prodigal to go nucl --> protein where we don't yet have protein fastas to download?
                         pf = f"genbank/proteomes/{acc}_protein.faa.gz"
                     outF.write(f"{name},{gf},{pf}\n")
+            for inp in input.curated:
+               with open(str(inp)) as inF:
+                   outF.write(inF.read())
 
     
  # Define the checkpoint function that allows us to read the fromfile.csv
@@ -223,6 +308,7 @@ rule combine_fasta:
 # Rule to build BLAST index for the combined gzipped fasta file
 rule build_nucl_index:
     input:
+        fromfile=os.path.join(out_dir, "{basename}.fromfile.csv"),
         fasta = os.path.join(out_dir, "{basename}.dna.fa.gz")
     output:
         index = os.path.join(out_dir, "blast", "{basename}.dna.index.nhr")
@@ -240,6 +326,7 @@ rule build_nucl_index:
 
 rule build_prot_index:
     input:
+        fromfile=os.path.join(out_dir, "{basename}.fromfile.csv"),
         fasta = os.path.join(out_dir, "{basename}.protein.fa.gz"),
     output:
         index = os.path.join(out_dir, "diamond", "{basename}.protein.fa.gz" + ".dmnd"),
