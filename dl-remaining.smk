@@ -11,6 +11,7 @@ vmr = pd.read_csv(vmr_file, sep='\t')
 
 suppressed_records = ['GCF_002987915.1', 'GCF_002830945.1', 'GCF_002828705.1', 'GCA_004789135.1']
 # first, add suppressed info into the VMR
+
 #add 'suppressed' into GenBank Failure column for these records
 vmr.loc[vmr['GenBank Assembly ID'].isin(suppressed_records), 'GenBank Failures'] = 'suppressed'
 
@@ -72,9 +73,7 @@ class Checkpoint_MakePattern:
 rule all:
     input:
         expand(os.path.join(out_dir, f"{basename}.{{moltype}}.curated.zip"), moltype = ['dna','protein']),
-        #os.path.join(out_dir, f"{basename}.curated-fromfile.csv")
-        #expand(os.path.join(out_dir, f"{basename}.{{moltype}}.zip"), moltype = ['dna','protein']),
-# make non_asd.fromfile.csv, with the VMR identifiers
+        os.path.join(out_dir, f'{basename}.curated-taxonomy.tsv'),
 
 rule download_genbank_accession:
     output: 
@@ -106,9 +105,8 @@ rule cat_components_to_vmr_assembly:
         nucl= protected(os.path.join(out_dir, "curated/nucleotide/{vmr_acc}.fna.gz")),
         fileinfo= protected(os.path.join(out_dir, "curated/fileinfo/{vmr_acc}.fileinfo.csv")),
     params:
+        prot_dir= os.path.join(out_dir, "curated/protein"),
         prot_out=protected(os.path.join(out_dir, "curated/protein/{vmr_acc}.faa.gz")),
-        #nucl=lambda w: expand(os.path.join(out_dir, "genbank/curated/nucleotide/{acc}.fna.gz"), acc=vmr_to_genbank[w.vmr_acc]),
-        #prot=lambda w: expand(os.path.join(out_dir, "genbank/curated/protein/{acc}.faa.gz"), acc=vmr_to_genbank[w.vmr_acc]),
     log: os.path.join(logs_dir, "curate_fasta", "{vmr_acc}.log")
     benchmark: os.path.join(logs_dir, "curate_fasta", "{vmr_acc}.benchmark")
     threads: 1
@@ -118,9 +116,10 @@ rule cat_components_to_vmr_assembly:
         partition="med2",
     shell:
         """
-        python curate-fasta.py --curated-acc {wildcards.vmr_acc} \
+        mkdir -p {params.prot_dir}
+        python curate-fasta.py --input-fileinfo {input.fileinfo} --curated-acc {wildcards.vmr_acc} \
                                --nucl-out {output.nucl} --prot-out {params.prot_out} \
-                               --fileinfo-out {output.fileinfo} {input.fileinfo} 2> {log}
+                               --fileinfo-out {output.fileinfo} 2> {log}
         """
 
 
@@ -162,4 +161,27 @@ rule sketch_fromfile:
     shell:
         """
         sourmash sketch fromfile {input.fromfile} -p {params} -o {output} --report-duplicated --ignore-missing 2> {log}
+        """
+
+
+rule build_dna_taxonomy:
+    input:
+        vmr_file = vmr_file,
+        fromfile=os.path.join(out_dir, "{basename}.fromfile.csv"),
+        curated_fromfile=os.path.join(out_dir, "{basename}.curated-fromfile.csv"),
+        fastas=ancient(Checkpoint_MakePattern("{fn}")),
+    output:
+        tax = os.path.join(out_dir, '{basename}.curated-taxonomy.tsv'),
+#        prot_tax = os.path.join(out_dir, '{basename}.protein-taxonomy.csv'), #columns prot_name, dna_acc, full_lineage
+    params:
+        suppressed_records = ' '.join(suppressed_records),
+    conda: 'conf/env/reports.yml'
+    log:  os.path.join(logs_dir, "build_taxonomy", "{basename}.curated.log")
+    benchmark:  os.path.join(logs_dir, "build_taxonomy", "{basename}.curated.benchmark")
+    shell:
+        """
+        python -Werror make-tax.py --vmr-tsv {input.vmr_file} \
+                                   --fromfile {input.fromfile} {input.curated_fromfile} \
+                                   --output {output.tax} \
+                                   --suppressed-records {params.suppressed_records} 2> {log}
         """

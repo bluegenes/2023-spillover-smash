@@ -4,19 +4,21 @@ import csv
 import argparse
 
 
-def read_input_fileinfo(fileinfo_csv):
+def read_input_fileinfo(fileinfo):
     """Reads in fileinfo csv file and returns a list of tuples containing
     the VMR accession number, the path to the nucleotide fasta file, and the
     path to the protein fasta file (optional)."""
     nucl, prot = [],[]
-    with open(fileinfo_csv) as inF:
-        reader = csv.reader(inF)
-        for row in reader:
-            # row = name,genome,protein
-            nucl.append(row[1])
-            prot.append(row[2])
-    print(f"nucl: {nucl}")
-    print(f"prot: {prot}")
+    for fileinfo_csv in fileinfo:
+        with open(str(fileinfo_csv)) as inF:
+            reader = csv.reader(inF)
+            for row in reader:
+                # row = name,genome,protein
+                nucl.append(row[1])
+                if row[2]:
+                    prot.append(row[2])
+    sys.stderr.write(f"nucl: {nucl}\n")
+    sys.stderr.write(f"prot: {prot}\n")
     return nucl, prot
 
 
@@ -30,18 +32,18 @@ def combine_fasta_files(fastas, outF):
 
 
 def main(args):
-    nucl, prot= read_input_fileinfo(args.fileinfo_csv)
+    nucl, prot= read_input_fileinfo(args.input_fileinfo)
     # combine fasta files
-    combine_fasta_files(nucl, args.nucl)
+    combine_fasta_files(nucl, args.nucl_out)
     if prot:
         combine_fasta_files(prot, args.prot_out)
 
     # write fileinfo
     with open(str(args.fileinfo_out), "w") as outF:
         if prot:
-            outF.write(f"{args.curated_acc},{args.output_nucl},{args.output_prot}\n")
+            outF.write(f"{args.curated_acc},{args.nucl_out},{args.prot_out}\n")
         else:
-            outF.write(f'{args.curated_acc},{args.output_nucl},\n')
+            outF.write(f'{args.curated_acc},{args.nucl_out},\n')
 
 
 def cmdline(sys_args):

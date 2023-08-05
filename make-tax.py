@@ -13,20 +13,21 @@ def get_gene_accs(fasta):
     return accs
 
 
-def build_geneD(fromfile_csv, suppressed_records=[]):
-    with open(fromfile_csv) as csvfile:
-        r = csv.DictReader(csvfile)
-        geneD = {}
-        for genome_acc in suppressed_records:
-            geneD[genome_acc] = {"dna": [], "protein": []}
-        for row in r:
-            genome_acc = row['name'].split(' ')[0]
-            gene_accs = get_gene_accs(row["genome_filename"])
-            prot_accs = []
-            if row["protein_filename"]:
-                prot_accs = get_gene_accs(row["protein_filename"])
-            geneD[genome_acc] = {"dna": gene_accs, "protein": prot_accs}
-        return geneD
+def build_geneD(fromfile_csv_list, suppressed_records=[]):
+    geneD = {}
+    for inF in fromfile_csv_list:
+        with open(inF) as csvfile:
+            r = csv.DictReader(csvfile)
+#            for genome_acc in suppressed_records:
+#                geneD[genome_acc] = {"dna": [], "protein": []}
+            for row in r:
+                genome_acc = row['name'].split(' ')[0]
+                gene_accs = get_gene_accs(row["genome_filename"])
+                prot_accs = []
+                if row["protein_filename"]:
+                    prot_accs = get_gene_accs(row["protein_filename"])
+                geneD[genome_acc] = {"dna": gene_accs, "protein": prot_accs}
+    return geneD
 
 def main(args):
     
@@ -35,7 +36,15 @@ def main(args):
     assembly_ident_col = 'GenBank Assembly ID'
     genbank_ident_col = 'Virus GENBANK accession'
     refseq_ident_col = 'Virus REFSEQ accession'
+
+    # handle GenBank Failures and suppressed records
+    vmr.loc[vmr['GenBank Assembly ID'].isin(args.suppressed_records), 'GenBank Failures'] = 'suppressed'
+    vmr['VMR_Accession'] = 'VMR_MSL38_' + vmr['Sort'].astype(str)
+    curate_info = ['suppressed', 'no_assembly', 'multiple_acc', 'parentheses']#, 'retrieval']
+
     vmr = vmr.rename(columns={assembly_ident_col: 'ident', genbank_ident_col: 'genbank_ident', refseq_ident_col: 'refseq_ident', 'Virus name(s)': 'name', 'Exemplar or additional isolate': 'exemplar_or_additional'})
+    # if GenBank Failures is in curate_info, set ident column to VMR accession
+    vmr.loc[vmr['GenBank Failures'].isin(curate_info), 'ident'] = vmr['VMR_Accession']
     vmr['superkingdom'] = 'Viruses'
     vmr = vmr.rename(columns=str.lower)
     lineage_columns = ['superkingdom', 'realm', 'subrealm', 'kingdom', 'subkingdom', 'phylum', 'subphylum', 'class', 'subclass',
@@ -56,7 +65,7 @@ def main(args):
 
 def cmdline(sys_args):
     p = argparse.ArgumentParser()
-    p.add_argument('-i', '--fromfile', help='sourmash fromfile csv with name,genome_filename,protein_filename columns', default="output.vmr/vmr_MSL38_v1.fromfile.csv")
+    p.add_argument('-i', '--fromfile', nargs='+', help='sourmash fromfile csv(s) with name,genome_filename,protein_filename columns', default=["output.vmr/vmr_MSL38_v1.fromfile.csv"])
     p.add_argument('-v', '--vmr-tsv', help='VMR tsv with genbank assembly accessions', default="inputs/VMR_MSL38_v1.acc.tsv")
     p.add_argument('-o', '--output', help='Output taxonomy TSV file', default="output.vmr/vmr_MSL38_v1.taxonomy.tsv")
     p.add_argument('-s', '--suppressed-records', nargs='+', help='Suppressed records', default=['GCF_002987915.1', 'GCF_002830945.1', 'GCF_002828705.1', 'GCA_004789135.1'])
