@@ -88,9 +88,9 @@ class Checkpoint_MakePattern:
 
 rule all:
     input:
-        #expand(os.path.join(out_dir, f"{basename}.{{moltype}}.zip"), moltype = ['dna', 'protein']),
-        #expand(os.path.join(out_dir, "blast", f"{basename}.dna.index.nhr")),
-        #expand(os.path.join(out_dir, "diamond", f"{basename}.protein.fa.gz.dmnd")),
+        expand(os.path.join(out_dir, f"{basename}.{{moltype}}.zip"), moltype = ['dna', 'protein']),
+        expand(os.path.join(out_dir, "blast", f"{basename}.dna.index.nhr")),
+        expand(os.path.join(out_dir, "diamond", f"{basename}.protein.fa.gz.dmnd")),
         os.path.join(out_dir, f'{basename}.taxonomy.tsv'),
         # os.path.join(out_dir, f'{basename}.protein-taxonomy.csv'),
 

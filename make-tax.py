@@ -30,7 +30,7 @@ def build_geneD(fromfile_csv_list, suppressed_records=[]):
     return geneD
 
 def main(args):
-    
+
     # read in VMR tsv containing virus metadata for exemplar and additional isolate genomes
     vmr = pd.read_csv(args.vmr_tsv, sep='\t')
     assembly_ident_col = 'GenBank Assembly ID'
@@ -40,7 +40,7 @@ def main(args):
     # handle GenBank Failures and suppressed records
     vmr.loc[vmr['GenBank Assembly ID'].isin(args.suppressed_records), 'GenBank Failures'] = 'suppressed'
     vmr['VMR_Accession'] = 'VMR_MSL38_' + vmr['Sort'].astype(str)
-    curate_info = ['suppressed', 'no_assembly', 'multiple_acc', 'parentheses']#, 'retrieval']
+    curate_info = ['suppressed', 'no_assembly', 'multiple_acc']#, 'parentheses']#, 'retrieval']
 
     vmr = vmr.rename(columns={assembly_ident_col: 'ident', genbank_ident_col: 'genbank_ident', refseq_ident_col: 'refseq_ident', 'Virus name(s)': 'name', 'Exemplar or additional isolate': 'exemplar_or_additional'})
     # if GenBank Failures is in curate_info, set ident column to VMR accession
