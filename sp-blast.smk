@@ -47,7 +47,7 @@ prot_fastas = prot_ff["protein_filename"].tolist()
 fastaD = {'dna': dna_fastas, 'protein': prot_fastas}
 
 # use database taxonomy files instead
-tax_file = os.path.join(db_dir, f"{db_basename}.taxonomy.csv")
+tax_file = os.path.join(db_dir, f"{db_basename}.taxonomy.tsv")
 
 # to do: use protein?
 #PROT_ACCS = [x for x in ACCS if x in PROT_EXISTS]

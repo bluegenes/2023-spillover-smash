@@ -5,14 +5,22 @@ import pandas as pd
 
 def add_taxonomy(row, gene2lineage):
     match_acc = row['sseqid']
-    if '|' in match_acc:
+    # blastn results have a prefix in front of accession, e.g. 'ref|NC_001422.1|'
+    if any(x in match_acc for x in ['ref|', 'gb|', 'dbj|', 'emb|']):
+#    if '|' in match_acc: # some blastn results have 'ref|' in front of accession
         pattern = r'\|([^|]+)\|'
-        match1 = re.search(pattern, match_acc).group(1)
-        match_acc = match1
+        match1 = re.search(pattern, match_acc)
+        if match1:
+            match_acc = match1.group(1)
+        else:
+            raise ValueError('Could not parse ref| accession from blastn result.')
     match_acc = match_acc.rsplit('.')[0]
     if match_acc not in gene2lineage.keys():
-        print(f"WARNING: {match_acc} lineage not found.")
-        row['lineage'] = 'NA'
+        if args.force:
+            print(f"WARNING: {match_acc} lineage not found.")
+            row['lineage'] = 'NA'
+        else:
+            raise ValueError(f"ERROR: {match_acc} lineage not found.")
     else:
         row['lineage'] = gene2lineage[match_acc]
     return row
@@ -68,6 +76,7 @@ def cmdline(sys_args):
     p.add_argument('-t', '--tax-file', help='taxonomy TSV file', default="output.vmr/vmr_MSL38_v1.taxonomy.tsv") 
     p.add_argument('--spillover-csv', help='spillover info file', default='inputs/2023-03-27_spillover_accession-numers.csv')
     p.add_argument('--searchtype', help='search type')
+    p.add_argument('--force', help='force continue if lineage not found', action='store_true')
     p.add_argument('-o', '--output-base' ,help='Output base', default=None)
     args = p.parse_args()
     
