@@ -14,7 +14,8 @@ def main(args):
     sDF = pd.read_csv(args.spillover_csv, index_col=0)
     blastn_df = pd.read_csv(args.blastn, sep='\t')
     blastx_df = pd.read_csv(args.blastx, sep='\t')
-    existing_spillover_columns = ['IndividualID', 'AccessionNumber', 'Virus', 'VirusGenus', 'VirusSpecies', 'VirusFamily', 'HostSpecies', 'HostGenus', 'HostFamily']
+#    existing_spillover_columns = ['IndividualID', 'AccessionNumber', 'Virus', 'VirusGenus', 'VirusSpecies', 'VirusFamily', 'HostSpecies', 'HostGenus', 'HostFamily']
+    existing_spillover_columns = ["AccessionNumber","n_spillover","n_viruses","viruses","datasources"]
 
     merged_bn = sDF.merge(blastn_df, on=existing_spillover_columns, how='left')
     merged_bx = sDF.merge(blastx_df, on=existing_spillover_columns, how='left')
@@ -25,7 +26,7 @@ def main(args):
     blastn_classif = merged_bn[merged_bn['lineage'].notnull()]
     print(blastn_classif.shape)
 
-    blastx_classif = merged_bx[~merged_bx['IndividualID'].isin(blastn_classif['IndividualID'])]
+    blastx_classif = merged_bx[~merged_bx['AccessionNumber'].isin(blastn_classif['AccessionNumber'])]
     print(blastx_classif.shape)
 
     merged = pd.concat([blastn_classif, blastx_classif])

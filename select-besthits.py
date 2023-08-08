@@ -7,7 +7,6 @@ def add_taxonomy(row, gene2lineage):
     match_acc = row['sseqid']
     # blastn results have a prefix in front of accession, e.g. 'ref|NC_001422.1|'
     if any(x in match_acc for x in ['ref|', 'gb|', 'dbj|', 'emb|']):
-#    if '|' in match_acc: # some blastn results have 'ref|' in front of accession
         pattern = r'\|([^|]+)\|'
         match1 = re.search(pattern, match_acc)
         if match1:
@@ -62,9 +61,10 @@ def main(args):
     blast_df = blast_df.apply(add_taxonomy, args=(gene2lineage,), axis=1)
 
     # merge with spillover info
-    sDF = pd.read_csv(args.spillover_csv, index_col=0)
-    blast_merged = sDF.merge(blast_df, right_on='qseqid', left_on='AccessionNumber', how='left')
-    blast_merged.to_csv(out_all, sep='\t', index=False)
+    if args.spillover_csv:
+        sDF = pd.read_csv(args.spillover_csv)#, index_col=0) # not for new 08/23 spillover file
+        blast_merged = sDF.merge(blast_df, right_on='qseqid', left_on='AccessionNumber', how='left')
+        blast_merged.to_csv(out_all, sep='\t', index=False)
 
     # select best hits
     best = select_best_hits(blast_merged)

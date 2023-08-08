@@ -7,7 +7,9 @@ db_dir = "output.vmr"
 out_dir = "output.spillover-blast"
 logdir = os.path.join(out_dir, 'logs')
 
-spillover_csv = 'inputs/2023-03-27_spillover_accession-numers.csv'
+#spillover_csv = 'inputs/2023-03-27_spillover_accession-numers.csv'
+spillover_csv = 'inputs/2023-08-07_spillover_accession-numbers_info.csv'
+
 # get genome filenames
 fromfile = 'output.spillover/spillover.fromfile.csv'
 ff = pd.read_csv(fromfile)
@@ -22,7 +24,7 @@ prot_ff = ff[~ff['protein_filename'].isna()]#['ident']
 ff.set_index('ident', inplace=True)
 
 # full set
-basename = 'spillover'
+basename = '2023-08-07-spillover'
 db_basename = 'vmr_MSL38_v1'
 ACCS = dna_acc
 PROT_ACCS = prot_ff['ident'].tolist()
@@ -134,7 +136,7 @@ localrules: select_besthits
 rule select_besthits:
     input:
         blast = os.path.join(out_dir, "{searchtype}", "{basename}-x-{db_basename}.{searchtype}.tsv"),
-        spillover_csv = 'inputs/2023-03-27_spillover_accession-numers.csv',
+        spillover_csv = spillover_csv, 
         tax = tax_file,
     output:
         all = os.path.join(out_dir, "{searchtype}", "{basename}-x-{db_basename}.{searchtype}.all.tsv"),
