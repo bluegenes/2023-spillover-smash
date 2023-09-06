@@ -71,6 +71,7 @@ rule all:
     input:
         expand(os.path.join(out_dir, "{searchtype}", f"{basename}-x-{db_basename}.{{searchtype}}.{{end}}.tsv"), searchtype = ['blastn', 'diamond-blastx'], end = ['best', 'all']),
         expand(os.path.join(out_dir, f"{basename}-x-{db_basename}.{{end}}.tsv"), end = ['bestblast', 'merged.missed', 'blastn.missed']),
+        expand(os.path.join(out_dir, 'combined', f"{basename}.{{moltype}}.lengths.csv"), moltype = ['dna']),
 
 
 rule combine_fasta:
@@ -84,6 +85,18 @@ rule combine_fasta:
         """
         zcat {input.fastas} | gzip > {output} 2> {log}
         """
+
+rule get_query_lengths:
+    input: os.path.join(out_dir,  "combined", "{basename}.{moltype}.fa.gz")
+    output: os.path.join(out_dir, 'combined', "{basename}.{moltype}.lengths.csv")
+    run:
+        import screed
+        with screed.open(input[0]) as seqfile, open(output[0], 'w') as outfile:
+            # Optionally, write a header
+            outfile.write("sequence_name,length\n")
+            for record in seqfile:
+                bp = len(record.sequence)
+                outfile.write(f"{record.name},{bp}\n")
 
 
 rule blastn:

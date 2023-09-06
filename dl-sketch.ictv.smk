@@ -93,7 +93,8 @@ rule all:
         expand(os.path.join(out_dir, "diamond", f"{basename}.protein.fa.gz.dmnd")),
         os.path.join(out_dir, f'{basename}.taxonomy.tsv'),
         # os.path.join(out_dir, f'{basename}.protein-taxonomy.csv'),
-
+        expand(os.path.join(out_dir, f"{basename}.{{moltype}}.lengths.csv"), moltype = ['dna', 'protein']),
+        
 ### Rules for ICTV GenBank Assemblies:
 # download genbank genome details; make an info.csv file for entry.
 rule make_genome_info_csv:
@@ -303,6 +304,17 @@ rule combine_fasta:
         """
         zcat {input.fastas} | gzip > {output} 2> {log}
         """
+
+rule get_fasta_lengths:
+    input: os.path.join(out_dir, "{basename}.{moltype}.fa.gz")
+    output: os.path.join(out_dir, "{basename}.{moltype}.lengths.csv")
+    run:
+        import screed
+        with screed.open(input[0]) as seqfile, open(output[0], 'w') as outfile:
+            outfile.write("sequence_name,length\n")
+            for record in seqfile:
+                bp = len(record.sequence)
+                outfile.write(f"{record.name},{bp}\n")
 
 
 # Rule to build BLAST index for the combined gzipped fasta file
