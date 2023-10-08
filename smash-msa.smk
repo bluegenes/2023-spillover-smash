@@ -25,7 +25,7 @@ rule all:
     input:
         expand(os.path.join(out_dir, "{basename}-x-{ref}.minimap2.bam"), basename = basename, ref = REF_ACC),
         expand(os.path.join(out_dir, "extracted", "{basename}-x-{ref}.extract.fna"), basename=basename, ref = REF_ACC),
-        expand(os.path.join(out_dir, "mafft", "{basename}-x-{ref}.alignment.fasta"), basename=basename, ref= REF_ACC),
+        # expand(os.path.join(out_dir, "mafft", "{basename}-x-{ref}.alignment.fasta"), basename=basename, ref= REF_ACC),
         os.path.join(out_dir, "mafft_allref", f"{basename}.alignment.fasta"),
         # expand("phylogenetic_tree_{query}_{ref}.nwk", query=sMap.keys(), reference=lambda x: mapping_dict[x])
 
@@ -143,7 +143,7 @@ rule align_sequences_grouped_refs:
     shell:
         """
         cat {input.queries} {input.extracted} > {output.combined}  2> {log}
-        mafft --auto {output.combined} > {output} 2>> {log}
+        mafft --auto {output.combined} > {output.alignment} 2>> {log}
         """
 
 
