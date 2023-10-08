@@ -8,6 +8,10 @@ logs_dir = os.path.join(out_dir, 'logs')
 basename = "vmr_MSL38_v1"
 vmr_file = 'inputs/VMR_MSL38_v1.acc.tsv'
 vmr = pd.read_csv(vmr_file, sep='\t')
+# mammarenavirus subset
+basename = "vmr_mammarenavirus"
+vmr_file = 'inputs/mm.vmr.tsv'
+vmr = pd.read_csv(vmr_file, sep='\t')
 
 # subsets and tests
 #vmr_file = 'inputs/VMR_MSL38_v1.lassa.tsv'
@@ -21,6 +25,8 @@ vmr = pd.read_csv(vmr_file, sep='\t')
 #basename = "ictv-spumavirus"
 
 suppressed_records = ['GCF_002987915.1', 'GCF_002830945.1', 'GCF_002828705.1', 'GCA_004789135.1']
+# set GenBank Failures dtype to str
+# vmr['GenBank Failures'] = vmr['GenBank Failures'].astype(str)
 # add 'suppressed' into GenBank Failure column for these records
 vmr.loc[vmr['GenBank Assembly ID'].isin(suppressed_records), 'GenBank Failures'] = 'suppressed'
 
@@ -32,14 +38,11 @@ ACCESSIONS = [a for a in vmr['GenBank Assembly ID'] if a and a not in null_list]
 # vmr38_v1: retrieval failures happened for the second of two accs, meaning we still got the valid assembly accession.
 # parentheses --> numbers are not the base pair ranges we actually need?
 # get working for rest first, then handle parens later
+VMR_ACCESSIONS = []
+vmr_to_genbank = {}
 curate_info = ['suppressed', 'no_assembly', 'multiple_acc'] #, 'parentheses']#, 'retrieval']
 # now select all rows in vmr that had a GenBank Failure
 curate_vmr = vmr.copy()[vmr['GenBank Failures'].isin(curate_info)]
-
-curate_vmr['VMR_Accession'] = 'VMR_MSL38_' + curate_vmr['Sort'].astype(str)
-VMR_ACCESSIONS = curate_vmr['VMR_Accession'].tolist()
-parentheses_acc = curate_vmr[curate_vmr['GenBank Failures'] == 'parentheses']['VMR_Accession'].tolist()
-########################################################################
 
 # get clean list of genbank nucleotide accession(s)
 def clean_genbank_accs(row):
@@ -53,9 +56,16 @@ def clean_genbank_accs(row):
         genbank_acc[i] = genbank_acc[i].strip()
     return genbank_acc
 
-curate_vmr.loc[:, 'genbank_accessions'] = curate_vmr.apply(clean_genbank_accs, axis=1)
-# get dictionary of vmr accession to genbank accession(s)
-vmr_to_genbank = dict(zip(curate_vmr['VMR_Accession'], curate_vmr['genbank_accessions']))
+# if we have rows that need to be curated, find genbank accessions and build vmr_to_genbank dictionary
+if not curate_vmr.empty:
+    curate_vmr['VMR_Accession'] = 'VMR_MSL38_' + curate_vmr['Sort'].astype(str)
+    VMR_ACCESSIONS = curate_vmr['VMR_Accession'].tolist()
+    parentheses_acc = curate_vmr[curate_vmr['GenBank Failures'] == 'parentheses']['VMR_Accession'].tolist()
+    
+    curate_vmr.loc[:, 'genbank_accessions'] = curate_vmr.apply(clean_genbank_accs, axis=1)
+    # get dictionary of vmr accession to genbank accession(s)
+    vmr_to_genbank = dict(zip(curate_vmr['VMR_Accession'], curate_vmr['genbank_accessions']))
+########################################################################
 
 wildcard_constraints:
     acc = '[^/]+',
@@ -89,8 +99,8 @@ class Checkpoint_MakePattern:
 rule all:
     input:
         expand(os.path.join(out_dir, f"{basename}.{{moltype}}.zip"), moltype = ['dna', 'protein']),
-        expand(os.path.join(out_dir, "blast", f"{basename}.dna.index.nhr")),
-        expand(os.path.join(out_dir, "diamond", f"{basename}.protein.fa.gz.dmnd")),
+        # expand(os.path.join(out_dir, "blast", f"{basename}.dna.index.nhr")),
+        # expand(os.path.join(out_dir, "diamond", f"{basename}.protein.fa.gz.dmnd")),
         os.path.join(out_dir, f'{basename}.taxonomy.tsv'),
         # os.path.join(out_dir, f'{basename}.protein-taxonomy.csv'),
         expand(os.path.join(out_dir, f"{basename}.{{moltype}}.lengths.csv"), moltype = ['dna', 'protein']),
@@ -270,7 +280,8 @@ checkpoint check_fromfile:
     output: touch(os.path.join(out_dir,".check_fromfile"))
 
 
-paramD = {"dna": "dna,k=21,k=31,scaled=1,abund", "protein": "protein,k=7,k=10,scaled=1,abund"}
+# paramD = {"dna": "dna,k=21,k=31,scaled=1,abund", "protein": "protein,k=7,k=10,scaled=1,abund"}
+paramD = {"dna": "dna,k=9,k=11,k=13,k=15,k=17,k=19,k=21,k=31,scaled=1,abund", "protein": "protein,k=5,k=6,k=7,k=8,k=9,k=10,scaled=1,abund"}
 rule sketch_fromfile:
     input: 
         fromfile=os.path.join(out_dir, "{basename}.fromfile.csv"),
@@ -302,7 +313,7 @@ rule combine_fasta:
     benchmark:  os.path.join(logs_dir, "combine", "{basename}.{moltype}.benchmark")
     shell:
         """
-        zcat {input.fastas} | gzip > {output} 2> {log}
+        gunzip -c {input.fastas} | gzip > {output} 2> {log}
         """
 
 rule get_fasta_lengths:

@@ -7,6 +7,9 @@ logs_dir = os.path.join(out_dir, 'logs')
 basename="spillover"
 
 sp_file = 'inputs/2023-03-27_spillover_accession-numers.csv'
+# mammarenavirus genus only
+sp_file = 'inputs/mm.spillover.csv'
+basename = 'mammarenavirus'
 
 sp = pd.read_csv(sp_file)
 
@@ -90,7 +93,7 @@ checkpoint check_fromfile:
     input: os.path.join(out_dir, f"{basename}.fromfile.csv"),
     output: touch(os.path.join(out_dir,".check_fromfile"))
 
-paramD = {"dna": "dna,k=21,k=31,scaled=1,abund", "protein": "protein,k=7,k=10,scaled=1,abund"}
+paramD = {"dna": "dna,k=9,k=11,k=13,k=15,k=17,k=19,k=21,k=31,scaled=1,abund", "protein": "protein,k=5,k=6,k=7,k=8,k=9,k=10,scaled=1,abund"}
 rule sketch_fromfile:
     input: 
         fromfile=os.path.join(out_dir, "{basename}.fromfile.csv"),
