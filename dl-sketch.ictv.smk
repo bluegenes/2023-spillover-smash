@@ -1,16 +1,23 @@
 import csv
 import pandas as pd
 import numpy as np
+import urllib
 
 out_dir = "output.vmr"
 logs_dir = os.path.join(out_dir, 'logs')
 
-basename = "vmr_MSL38_v1"
-vmr_file = 'inputs/VMR_MSL38_v1.acc.tsv'
-vmr = pd.read_csv(vmr_file, sep='\t')
+# full VMR
+# basename = "vmr_MSL38_v1"
+# vmr_file = 'inputs/VMR_MSL38_v1.acc.tsv'
+# vmr = pd.read_csv(vmr_file, sep='\t')
+
 # mammarenavirus subset
-basename = "vmr_mammarenavirus"
-vmr_file = 'inputs/mm.vmr.tsv'
+# basename = "vmr_mammarenavirus"
+# vmr_file = 'inputs/mm.vmr.tsv'
+# vmr = pd.read_csv(vmr_file, sep='\t')
+# orthohantavirus
+basename = "vmr_orthohantavirus"
+vmr_file = 'inputs/orthohantavirus.vmr.tsv'
 vmr = pd.read_csv(vmr_file, sep='\t')
 
 # subsets and tests

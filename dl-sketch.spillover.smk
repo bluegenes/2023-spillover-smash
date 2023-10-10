@@ -8,8 +8,11 @@ basename="spillover"
 
 sp_file = 'inputs/2023-03-27_spillover_accession-numers.csv'
 # mammarenavirus genus only
-sp_file = 'inputs/mm.spillover.csv'
-basename = 'mammarenavirus'
+# sp_file = 'inputs/mm.spillover.csv'
+# basename = 'mammarenavirus'
+# orthohantavirus only
+sp_file = 'inputs/hantavirus.spillover.csv'
+basename = 'hantavirus'
 
 sp = pd.read_csv(sp_file)
 

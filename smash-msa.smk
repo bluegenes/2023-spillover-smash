@@ -1,4 +1,5 @@
 import os
+import csv
 import pandas as pd
 
 # Load the mapping info from the CSV into a DataFrame
@@ -11,14 +12,20 @@ import pandas as pd
 # for now, let's just load a query csv and a reference csv and map all query --> all ref
 basename = 'mammarenavirus'
 out_dir = 'output.mm'
-logs_dir = os.path.join(out_dir, 'logs')
-
 query_csv = 'inputs/mm.spillover.csv'
-qInf = pd.read_csv(query_csv)
-QUERY_ACC = qInf['AccessionNumber']
 ref_csv = 'inputs/mm.vmr.tsv'
 rInf = pd.read_csv(ref_csv, sep = '\t')
+# basename = 'orthohantavirus'
+# out_dir = 'output.orthohantavirus'
+# query_csv = 'inputs/hantavirus.spillover.csv'
+# ref_csv = 'inputs/orthohantavirus.vmr.csv'
+# rInf = pd.read_csv(ref_csv, sep = ',')
+
+
+qInf = pd.read_csv(query_csv)
+QUERY_ACC = qInf['AccessionNumber']
 REF_ACC = rInf['GenBank Assembly ID'] # future: need to handle curated / non Assembly datasets identifiers too!
+logs_dir = os.path.join(out_dir, 'logs')
 
 
 rule all:
@@ -27,6 +34,8 @@ rule all:
         expand(os.path.join(out_dir, "extracted", "{basename}-x-{ref}.extract.fna"), basename=basename, ref = REF_ACC),
         # expand(os.path.join(out_dir, "mafft", "{basename}-x-{ref}.alignment.fasta"), basename=basename, ref= REF_ACC),
         os.path.join(out_dir, "mafft_allref", f"{basename}.alignment.fasta"),
+        os.path.join(out_dir, "extracted", f"{basename}.ref-coodinates.csv"),
+        classif = os.path.join(out_dir, f"{basename}.classif.csv"),
         # expand("phylogenetic_tree_{query}_{ref}.nwk", query=sMap.keys(), reference=lambda x: mapping_dict[x])
 
 rule combine_query_fasta:
@@ -144,6 +153,38 @@ rule align_sequences_grouped_refs:
         """
         cat {input.queries} {input.extracted} > {output.combined}  2> {log}
         mafft --auto {output.combined} > {output.alignment} 2>> {log}
+        """
+
+# Aggregate the reference genome coordinates and contig names
+rule aggregate_coordinates:
+    input:
+        coords=expand(os.path.join(out_dir, "minimap2", "{{basename}}-x-{r_acc}.minimap2.consensus_coordinates.txt"), r_acc=REF_ACC),
+    output:
+        os.path.join(out_dir, "extracted", "{basename}.ref-coodinates.csv")
+    run:
+        with open(str(output), 'w') as outF:
+            writer = csv.writer(outF, delimiter=',')
+            for coords_file in input.coords:
+                with open(coords_file, 'r') as inF:
+                    ref_name = os.path.basename(coords_file).split('-x-')[1].rsplit('.minimap2')[0]
+                    reader = csv.reader(inF, delimiter='\t')
+                    for row in reader:
+                        contig, start, end = row
+                        writer.writerow([ref_name, contig, start, end])
+                    
+
+rule msa_closest:
+    input:
+        coords= os.path.join(out_dir, "extracted", "{basename}.ref-coodinates.csv"),
+        msa=os.path.join(out_dir, "mafft_allref", "{basename}.alignment.fasta"),
+    output:
+        classif = os.path.join(out_dir, "{basename}.classif.csv"),
+    shell:
+        """
+        python msa-to-closest-ref.py -m {input.msa} \
+                                     -c {input.coords} \
+                                     -o {output} \
+                                     --top-n 10
         """
 
 
