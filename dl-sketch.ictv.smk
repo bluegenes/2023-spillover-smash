@@ -108,7 +108,7 @@ rule all:
         expand(os.path.join(out_dir, f"{basename}.{{moltype}}.zip"), moltype = ['dna', 'protein']),
         # expand(os.path.join(out_dir, "blast", f"{basename}.dna.index.nhr")),
         # expand(os.path.join(out_dir, "diamond", f"{basename}.protein.fa.gz.dmnd")),
-        os.path.join(out_dir, f'{basename}.taxonomy.tsv'),
+        os.path.join(out_dir, f'{basename}.taxonomy.csv'),
         # os.path.join(out_dir, f'{basename}.protein-taxonomy.csv'),
         expand(os.path.join(out_dir, f"{basename}.{{moltype}}.lengths.csv"), moltype = ['dna', 'protein']),
         
@@ -250,6 +250,37 @@ rule cat_components_to_vmr_assembly:
         """
 
 
+rule translate_proteomes:
+    input:
+        csv = os.path.join(out_dir, "{basename}.fromfile.csv")
+        nucl = "genbank/genomes/{acc}_genomic.fna.gz"
+    output:
+        translated=protected(os.path.join(genbank, "translate/{acc}_protein.faa.gz")),
+    conda: "conf/env/seqkit.yml"
+    log: os.path.join(logs_dir, 'seqkit-translate', '{acc}.log')
+    params:
+        nucl = f"os.path.join(out_dir, "genomic/{w.acc}.fna.gz")"
+    threads: 1
+    shell:
+        """
+        seqkit translate {input.nucl} | gzip > {output} 2> {log}
+        """
+
+rule translate_curated:
+    input:
+        csv = os.path.join(out_dir, "{basename}.fromfile.csv")
+        nucl = f"{out_dir}/curated/nucleotide/{{acc}}.fna.gz"
+    output:
+        translated=protected(os.path.join(out_dir, 'curated', "translate/{acc}.faa.gz")),
+    conda: "conf/env/seqkit.yml"
+    log: os.path.join(logs_dir, 'seqkit-translate', 'curated', '{acc}.log')
+    threads: 1
+    shell:
+        """
+        seqkit translate {input.nucl} | gzip > {output} 2> {log}
+        """
+
+
 localrules: build_fromfile_from_assemblyinfo
 rule build_fromfile_from_assemblyinfo: # include curated fileinfo
     input: 
@@ -275,10 +306,17 @@ rule build_fromfile_from_assemblyinfo: # include curated fileinfo
                     if row["protein_url"]:
                         # do we want to add prodigal to go nucl --> protein where we don't yet have protein fastas to download?
                         pf = f"genbank/proteomes/{acc}_protein.faa.gz"
+                    else:
+                        pf = f"genbank/translate/{acc}_protein.faa.gz"
                     outF.write(f"{name},{gf},{pf}\n")
             for inp in input.curated:
                with open(str(inp)) as inF:
-                   outF.write(inF.read())
+                    name,dna,prot = inF.read().split(',')
+                    this_acc = name.split(' ')[0]
+                    if this_acc not in prot:
+                        prot = f"{out_dir}/curated/translate/{this_acc}.faa.gz\n"    
+                    outF.write(f"{name},{dna},{prot}")
+                #    outF.write(inF.read())
 
     
  # Define the checkpoint function that allows us to read the fromfile.csv
@@ -288,7 +326,7 @@ checkpoint check_fromfile:
 
 
 # paramD = {"dna": "dna,k=21,k=31,scaled=1,abund", "protein": "protein,k=7,k=10,scaled=1,abund"}
-paramD = {"dna": "dna,k=9,k=11,k=13,k=15,k=17,k=19,k=21,k=31,scaled=1,abund", "protein": "protein,k=5,k=6,k=7,k=8,k=9,k=10,scaled=1,abund"}
+paramD = {"dna": "dna,k=9,k=11,k=13,k=15,k=17,k=19,k=21,k=31,scaled=1,abund", "protein": "protein,k=3,k=4,k=5,k=6,k=7,k=8,k=9,k=10,scaled=1,abund"}
 rule sketch_fromfile:
     input: 
         fromfile=os.path.join(out_dir, "{basename}.fromfile.csv"),
