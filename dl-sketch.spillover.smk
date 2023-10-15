@@ -6,13 +6,14 @@ out_dir = "output.spillover"
 logs_dir = os.path.join(out_dir, 'logs')
 basename="spillover"
 
-sp_file = 'inputs/2023-03-27_spillover_accession-numers.csv'
+# sp_file = 'inputs/2023-03-27_spillover_accession-numers.csv'
+sp_file = 'inputs/2023-08-07_spillover_accession-numbers_info.csv'
 # mammarenavirus genus only
 # sp_file = 'inputs/mm.spillover.csv'
 # basename = 'mammarenavirus'
 # orthohantavirus only
-sp_file = 'inputs/hantavirus.spillover.csv'
-basename = 'hantavirus'
+#sp_file = 'inputs/hantavirus.spillover.csv'
+#basename = 'hantavirus'
 
 sp = pd.read_csv(sp_file)
 
@@ -40,7 +41,6 @@ class Checkpoint_MakePattern:
             filename_col = 'protein_filename'
         # filter df to get non-empties in relevant column
         fastas = df[filename_col][df[filename_col].notnull()].tolist()
-
         return fastas
 
     def __call__(self, w):
@@ -78,6 +78,20 @@ rule download_spillover_accession:
         python genbank_nuccore.py {wildcards.acc} --nucleotide {output.nucl} --protein {params.prot} --fileinfo {output.fileinfo} 2> {log}
         """
 
+rule translate_protein:
+    input:
+        fileinfo=os.path.join(out_dir, "fileinfo/{acc}.fileinfo.csv"),
+        nucl=os.path.join(out_dir, "genomic/{acc}.fna.gz"),
+    output:
+        translated=protected(os.path.join(out_dir, "translate/{acc}.faa.gz")),
+    # conda: "conf/env/seqkit.yml"
+    log: os.path.join(logs_dir, 'seqkit', '{acc}.log')
+    threads: 1
+    shell:
+        """
+        seqkit translate {input.nucl} | gzip > {output} 2> {log}
+        """
+
 rule aggregate_fileinfo_to_fromfile:
     input: 
         fileinfo=expand(os.path.join(out_dir, "fileinfo/{acc}.fileinfo.csv"), acc=ACCESSIONS)
@@ -89,9 +103,15 @@ rule aggregate_fileinfo_to_fromfile:
             outF.write(header + '\n')
             for inp in input:
                 with open(str(inp)) as inF:
-                    outF.write(inF.read())
+                    # outF.write(inF.read())
+                    # if protein_filename doesn't exist, use translated
+                    name,dna,prot = inF.read().split(',')
+                    this_acc = name.split(' ')[0]
+                    if this_acc not in prot:
+                        prot = f"{out_dir}/translate/{this_acc}.faa.gz\n"
+                    outF.write(f"{name},{dna},{prot}")
 
- # Define the checkpoint function that allows us to read the fromfile.csv
+# Define the checkpoint function that allows us to read the fromfile.csv
 checkpoint check_fromfile:
     input: os.path.join(out_dir, f"{basename}.fromfile.csv"),
     output: touch(os.path.join(out_dir,".check_fromfile"))

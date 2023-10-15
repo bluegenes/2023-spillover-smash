@@ -14,6 +14,9 @@ basename = 'mammarenavirus'
 out_dir = 'output.mm'
 query_csv = 'inputs/mm.spillover.csv'
 ref_csv = 'inputs/mm.vmr.tsv'
+fromfile_csv = f'output.spillover/mammarenavirus.fromfile.csv'
+fastaDF = pd.read_csv(fromfile_csv)
+spillover_fastas = {'dna': fastaDF['genome_filename'], 'protein': fastaDF['protein_filename']}
 rInf = pd.read_csv(ref_csv, sep = '\t')
 # basename = 'orthohantavirus'
 # out_dir = 'output.orthohantavirus'
@@ -27,7 +30,6 @@ QUERY_ACC = qInf['AccessionNumber']
 REF_ACC = rInf['GenBank Assembly ID'] # future: need to handle curated / non Assembly datasets identifiers too!
 logs_dir = os.path.join(out_dir, 'logs')
 
-
 rule all:
     input:
         expand(os.path.join(out_dir, "{basename}-x-{ref}.minimap2.bam"), basename = basename, ref = REF_ACC),
@@ -35,18 +37,35 @@ rule all:
         # expand(os.path.join(out_dir, "mafft", "{basename}-x-{ref}.alignment.fasta"), basename=basename, ref= REF_ACC),
         os.path.join(out_dir, "mafft_allref", f"{basename}.alignment.fasta"),
         os.path.join(out_dir, "extracted", f"{basename}.ref-coodinates.csv"),
-        classif = os.path.join(out_dir, f"{basename}.classif.csv"),
+        os.path.join(out_dir, f"{basename}.classif.csv"),
+        expand(os.path.join(out_dir, 'muscle', f'{basename}.{{moltype}}.fa'), moltype = ['protein']),
         # expand("phylogenetic_tree_{query}_{ref}.nwk", query=sMap.keys(), reference=lambda x: mapping_dict[x])
 
-rule combine_query_fasta:
+rule combine_dna_fasta:
     input: 
-        fastas = expand("output.spillover/genomic/{q_acc}.fna.gz", q_acc = QUERY_ACC),
+        query_fastas = expand("output.spillover/genomic/{q_acc}.fna.gz", q_acc = QUERY_ACC),
     output: os.path.join(out_dir, "combined", "{basename}.dna.fna")
     log:  os.path.join(logs_dir, "combine", "{basename}.dna.log")
     benchmark:  os.path.join(logs_dir, "combine", "{basename}.dna.benchmark")
     shell:
         """
         gunzip -c {input.fastas} > {output} 2> {log}
+        """
+
+rule combine_protein_fasta:
+    input: 
+        # query_fastas = expand("output.spillover/protein/{q_acc}.faa.gz", q_acc = QUERY_ACC),
+        query_fastas = lambda w: spillover_fastas['protein'],
+        ref_fastas = expand('genbank/proteomes/{ref}_protein.faa.gz', ref = REF_ACC),
+    output: 
+        query_combined = os.path.join(out_dir, "combined", "{basename}.protein.faa"),
+        query_and_ref = os.path.join(out_dir, "combined", "{basename}.wrefs.protein.faa"),
+    log:  os.path.join(logs_dir, "combine", "{basename}.protein.log")
+    benchmark:  os.path.join(logs_dir, "combine", "{basename}.protein.benchmark")
+    shell:
+        """
+        gunzip -c {input.query_fastas} > {output.query_combined} 2> {log}
+        gunzip -c {input.query_fastas} {input.ref_fastas} > {output.query_and_ref} 2>> {log}
         """
 
 rule samtools_index_reference:
@@ -60,8 +79,8 @@ rule samtools_index_reference:
         gunzip -c {input} > {output.fa}
         samtools faidx {output.fa}
         """ 
-
-rule minimap2_map_sequences: # map all queries to all refs??? Or all queries to EACH ref? Start with the latter
+# map all queries to all refs??? Or all queries to EACH ref? Start with the latter
+rule minimap2_map_sequences: 
     input:
         # query_fna = "output.spillover/genomic/{q_acc}.fna.gz",
         query_fna = os.path.join(out_dir, "combined", "{basename}.dna.fna"),
@@ -185,6 +204,28 @@ rule msa_closest:
                                      -c {input.coords} \
                                      -o {output} \
                                      --top-n 10
+        """
+
+
+
+rule muscle_protein:
+    input:
+        fasta = os.path.join(out_dir, "combined", "{basename}.wrefs.protein.faa"), 
+        # fastas = lambda w: spillover_fastas[w.moltype],
+    output:
+        aligned = os.path.join(out_dir, 'muscle', '{basename}.{moltype}.fa')
+    log: os.path.join(logs_dir, 'muscle', '{basename}.{moltype}.log')
+    shell:
+        """
+        muscle -align {input} -output {output.aligned} 2> {log}
+        """
+
+rule iqtree_muscle:
+    input:
+    output:
+    shell:
+        """
+        iqtree -s {input} --mem 8G -v -m TEST > {output}
         """
 
 
