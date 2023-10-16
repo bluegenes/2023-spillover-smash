@@ -10,7 +10,7 @@ sp_fromfile = 'output.spillover/spillover.fromfile.csv'
 sp = pd.read_csv(sp_fromfile)
 
 params = {"dna": {"ksize": [9,15,21], "scaled": 1, "threshold_bp": 0},
-          "protein": {"ksize": [5,7], "scaled": 1, "threshold_bp": 0}} # 6,10
+          "protein": {"ksize": [5, 7], "scaled": 1, "threshold_bp": 0}} #, 6,10
 
 TAX_FILE = 'inputs/vmr_MSL38_v1.taxonomy.csv'
 
@@ -40,14 +40,15 @@ all_params = prot_params
 rule all:
     input:
         expand(f"{out_dir}/fastmultigather/{{search_params}}.gather.csv", search_params = all_params), 
-        # expand(f"{out_dir}/fastmultigather/{{search_params}}.gather.with-lineages.csv", search_params = all_params), 
+        expand(f"{out_dir}/fastmultigather/{{search_params}}.gather.with-lineages.csv", search_params = all_params), 
 
 
 rule index_database:
     input:
         db_zip = "output.vmr/{db_basename}.{moltype}.zip"
     output:
-        db_rocksdb = "output.vmr/{db_basename}.{moltype}-k{ksize}.rocksdb"
+        db_rocksdb = directory("output.vmr/{db_basename}.{moltype}-k{ksize}.rocksdb"),
+        current_file = "output.vmr/{db_basename}.{moltype}-k{ksize}.rocksdb/CURRENT",
     conda: "conf/env/branchwater.yml"
     log: f"{logs_dir}/index/{{db_basename}}.{{moltype}}-k{{ksize}}.index.log"
     threads: 1
@@ -60,26 +61,28 @@ rule index_database:
 rule sourmash_fastmultigather:
     input:
         query_zip = f"{out_dir}/{{basename}}.{{moltype}}.zip",
-        database  = "output.vmr/{db_basename}.{moltype}-k{ksize}.rocksdb",
+        database  = "output.vmr/{db_basename}.{moltype}-k{ksize}.rocksdb/CURRENT",
     output:
         f"{out_dir}/fastmultigather/{{basename}}-x-{{db_basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.t{{threshold}}.gather.csv",
     resources:
         mem_mb=lambda wildcards, attempt: attempt *50000,
         time=60,
         partition="low2",
-    threads: 64
+    threads: 100
     log: f"{logs_dir}/fastmultigather/{{basename}}-x-{{db_basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.t{{threshold}}.log"
     benchmark: f"{logs_dir}/fastmultigather/{{basename}}-x-{{db_basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.t{{threshold}}.benchmark"
     conda: "conf/env/branchwater.yml"
+    params:
+        db_dir = lambda w: f'output.vmr/{w.db_basename}.{w.moltype}-k{w.ksize}.rocksdb',
     shell:
         """
-        echo "DB: {input.database}"
-        echo "DB: {input.database}" > {log}
+        echo "DB: {params.db_dir}"
+        echo "DB: {params.db_dir}" > {log}
 
         sourmash scripts fastmultigather --threshold {wildcards.threshold} \
                           --moltype {wildcards.moltype} --ksize {wildcards.ksize} \
                           --scaled {wildcards.scaled} {input.query_zip} \
-                          {input.database} -o {output} 2> {log}
+                          {params.db_dir} -o {output} 2>> {log}
         """
 
 
@@ -93,11 +96,13 @@ rule tax_annotate:
         mem_mb=lambda wildcards, attempt: attempt *3000,
         partition = "low2",
         time=240,
-    params:
-        outd= lambda w: os.path.join(out_dir, f'gather/{w.moltype}'),
-        out_base= lambda w: f'{w.acc}.k{w.ksize}.gather',
     conda: "conf/env/sourmash-ictv.yml"
+    log: f"{logs_dir}/annotate/{{basename}}-x-{{db_basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.t{{threshold}}.ictv.log"
+    params:
+        output_dir = f"{out_dir}/fastmultigather",
     shell:
         """
-        sourmash tax annotate -g {input.gather_csv} -t {input.lineages} --ictv 2> {log}
+        sourmash tax annotate -g {input.gather_csv} \
+                              -t {input.lineages} \
+                              --ictv -o {params.output_dir} 2> {log}
         """
