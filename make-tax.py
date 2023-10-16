@@ -49,9 +49,13 @@ def main(args):
     vmr = vmr.rename(columns=str.lower)
     lineage_columns = ['superkingdom', 'realm', 'subrealm', 'kingdom', 'subkingdom', 'phylum', 'subphylum', 'class', 'subclass',
                  'order', 'suborder', 'family', 'subfamily', 'genus', 'subgenus', 'species', 'name']
-    # some names have ';' in them, e.g. 'invertebrate iridescent virus 6; Chilo iridescent virus' KEEP TSV instead of CSV; use ',' to sep
+    # some names have ';' in them, e.g. 'invertebrate iridescent virus 6; Chilo iridescent virus'
     # some (one) have ',' in them. Replace that with '_' to prevent issues.
+    # Options:
+    # - could keep tsv instead of csv, using ',' to sep. Problem: all sourmash taxonomy files are csv, not designed to work with tsv
+    # - alternatively, replace ';' with '__' and ',' with '_' in the name column
     vmr['name'] = vmr['name'].str.replace(',', '_')
+    vmr['name'] = vmr['name'].str.replace(';', '__')
     vmr['lineage'] = vmr[lineage_columns].fillna('').apply(lambda x: ','.join(x.astype(str)), axis=1)
     vmr = vmr[vmr['ident'].notnull()]
     # build dictionary of genome assembly accession to gene/protein accessions
@@ -61,13 +65,13 @@ def main(args):
     print(vmr.shape)
     tax_columns = ['ident', 'genbank_ident', 'refseq_ident'] + lineage_columns + ['lineage', 'exemplar_or_additional', 'gene_accs', 'protein_accs']
     tax_info = vmr[tax_columns]
-    tax_info.to_csv(args.output, sep='\t', index=False)
+    tax_info.to_csv(args.output, sep=',', index=False)
 
 def cmdline(sys_args):
     p = argparse.ArgumentParser()
     p.add_argument('-i', '--fromfile', nargs='+', help='sourmash fromfile csv(s) with name,genome_filename,protein_filename columns', default=["output.vmr/vmr_MSL38_v1.fromfile.csv"])
     p.add_argument('-v', '--vmr-tsv', help='VMR tsv with genbank assembly accessions', default="inputs/VMR_MSL38_v1.acc.tsv")
-    p.add_argument('-o', '--output', help='Output taxonomy TSV file', default="output.vmr/vmr_MSL38_v1.taxonomy.tsv")
+    p.add_argument('-o', '--output', help='Output taxonomy CSV file', default="output.vmr/vmr_MSL38_v1.taxonomy.csv")
     p.add_argument('-s', '--suppressed-records', nargs='+', help='Suppressed records', default=['GCF_002987915.1', 'GCF_002830945.1', 'GCF_002828705.1', 'GCA_004789135.1'])
     args = p.parse_args()
     return main(args)

@@ -84,7 +84,7 @@ rule translate_protein:
         nucl=os.path.join(out_dir, "genomic/{acc}.fna.gz"),
     output:
         translated=protected(os.path.join(out_dir, "translate/{acc}.faa.gz")),
-    # conda: "conf/env/seqkit.yml"
+    conda: "conf/env/seqkit.yml"
     log: os.path.join(logs_dir, 'seqkit', '{acc}.log')
     threads: 1
     shell:
@@ -130,10 +130,13 @@ rule sketch_fromfile:
         runtime=60,
         time=90,
         partition="low2",
-    conda: "conf/env/sourmash.yml"
+    # conda: "conf/env/sourmash.yml"
+    conda: "conf/env/branchwater.yml"
     log:  os.path.join(logs_dir, "sketch", "{basename}.{moltype}.log")
     benchmark:  os.path.join(logs_dir, "sketch", "{basename}.{moltype}.benchmark")
     shell:
         """
-        sourmash sketch fromfile {input.fromfile} -p {params} -o {output} --report-duplicated --ignore-missing 2> {log}
+        sourmash scripts manysketch {input.fromfile} -p {params} \
+                                    -o {output} 2> {log}
         """
+        # sourmash sketch fromfile {input.fromfile} -p {params} -o {output} --report-duplicated --ignore-missing 2> {log}

@@ -7,18 +7,18 @@ out_dir = "output.vmr"
 logs_dir = os.path.join(out_dir, 'logs')
 
 # full VMR
-# basename = "vmr_MSL38_v1"
-# vmr_file = 'inputs/VMR_MSL38_v1.acc.tsv'
-# vmr = pd.read_csv(vmr_file, sep='\t')
+basename = "vmr_MSL38_v1"
+vmr_file = 'inputs/VMR_MSL38_v1.acc.tsv'
+vmr = pd.read_csv(vmr_file, sep='\t')
 
 # mammarenavirus subset
 # basename = "vmr_mammarenavirus"
 # vmr_file = 'inputs/mm.vmr.tsv'
 # vmr = pd.read_csv(vmr_file, sep='\t')
 # orthohantavirus
-basename = "vmr_orthohantavirus"
-vmr_file = 'inputs/orthohantavirus.vmr.tsv'
-vmr = pd.read_csv(vmr_file, sep='\t')
+# basename = "vmr_orthohantavirus"
+# vmr_file = 'inputs/orthohantavirus.vmr.tsv'
+# vmr = pd.read_csv(vmr_file, sep='\t')
 
 # subsets and tests
 #vmr_file = 'inputs/VMR_MSL38_v1.lassa.tsv'
@@ -110,7 +110,7 @@ rule all:
         # expand(os.path.join(out_dir, "diamond", f"{basename}.protein.fa.gz.dmnd")),
         os.path.join(out_dir, f'{basename}.taxonomy.csv'),
         # os.path.join(out_dir, f'{basename}.protein-taxonomy.csv'),
-        expand(os.path.join(out_dir, f"{basename}.{{moltype}}.lengths.csv"), moltype = ['dna', 'protein']),
+        # expand(os.path.join(out_dir, f"{basename}.{{moltype}}.lengths.csv"), moltype = ['dna', 'protein']),
         
 ### Rules for ICTV GenBank Assemblies:
 # download genbank genome details; make an info.csv file for entry.
@@ -252,14 +252,12 @@ rule cat_components_to_vmr_assembly:
 
 rule translate_proteomes:
     input:
-        csv = os.path.join(out_dir, "{basename}.fromfile.csv")
-        nucl = "genbank/genomes/{acc}_genomic.fna.gz"
+        csv = os.path.join(out_dir, f"{basename}.fromfile.csv"),
+        nucl = "genbank/genomes/{acc}_genomic.fna.gz",
     output:
-        translated=protected(os.path.join(genbank, "translate/{acc}_protein.faa.gz")),
+        translated=protected("genbank/translate/{acc}_protein.faa.gz"),
     conda: "conf/env/seqkit.yml"
     log: os.path.join(logs_dir, 'seqkit-translate', '{acc}.log')
-    params:
-        nucl = f"os.path.join(out_dir, "genomic/{w.acc}.fna.gz")"
     threads: 1
     shell:
         """
@@ -268,8 +266,8 @@ rule translate_proteomes:
 
 rule translate_curated:
     input:
-        csv = os.path.join(out_dir, "{basename}.fromfile.csv")
-        nucl = f"{out_dir}/curated/nucleotide/{{acc}}.fna.gz"
+        csv = os.path.join(out_dir, f"{basename}.fromfile.csv"),
+        nucl = f"{out_dir}/curated/nucleotide/{{acc}}.fna.gz",
     output:
         translated=protected(os.path.join(out_dir, 'curated', "translate/{acc}.faa.gz")),
     conda: "conf/env/seqkit.yml"
@@ -340,13 +338,16 @@ rule sketch_fromfile:
         runtime=4000,
         time=4000,
         partition="high2",
-    conda: "conf/env/sourmash.yml"
-    log:  os.path.join(logs_dir, "sketch", "{basename}.{moltype}.log")
-    benchmark:  os.path.join(logs_dir, "sketch", "{basename}.{moltype}.benchmark")
+    conda: "conf/env/branchwater.yml"
+    #conda: "pyo3-branch"
+    log:  os.path.join(logs_dir, "manysketch", "{basename}.{moltype}.log")
+    benchmark:  os.path.join(logs_dir, "manysketch", "{basename}.{moltype}.benchmark")
     shell:
         """
-        sourmash sketch fromfile {input.fromfile} -p {params} -o {output} --report-duplicated --ignore-missing 2> {log}
+        sourmash scripts manysketch {input.fromfile} -p {params} \
+                                    -o {output} 2> {log}
         """
+        # sourmash sketch fromfile {input.fromfile} -p {params} -o {output} --report-duplicated --ignore-missing 2> {log}
 
 rule combine_fasta:
     input: 

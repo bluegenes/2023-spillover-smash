@@ -71,7 +71,7 @@ rule all:
     input:
         expand(os.path.join(out_dir, "{searchtype}", f"{basename}-x-{db_basename}.{{searchtype}}.{{end}}.tsv"), searchtype = ['blastn', 'diamond-blastx'], end = ['best', 'all']),
         expand(os.path.join(out_dir, f"{basename}-x-{db_basename}.{{end}}.tsv"), end = ['bestblast', 'merged.missed', 'blastn.missed']),
-        expand(os.path.join(out_dir, 'combined', f"{basename}.{{moltype}}.lengths.csv"), moltype = ['dna']),
+        expand(os.path.join(out_dir, 'combined', f"{basename}.{{moltype}}.lengths.csv"), moltype = ['dna', 'protein']),
 
 
 rule combine_fasta:
@@ -172,6 +172,8 @@ rule combine_best:
     input:
         blastn = os.path.join(out_dir, "blastn", "{basename}-x-{db_basename}.blastn.best.tsv"),
         blastx = os.path.join(out_dir, "diamond-blastx", "{basename}-x-{db_basename}.diamond-blastx.best.tsv"),
+        dna_lengths = os.path.join(out_dir, 'combined', "{basename}.dna.lengths.csv"),
+        protein_lengths = os.path.join(out_dir, 'combined', "{basename}.protein.lengths.csv"),
         spillover_csv = spillover_csv,
     output:
         besthit_classif = os.path.join(out_dir, "{basename}-x-{db_basename}.bestblast.tsv"),
@@ -188,5 +190,7 @@ rule combine_best:
                --spillover-csv {input.spillover_csv} \
                --blastn {input.blastn} \
                --blastx {input.blastx} \
+               --query-dna-lengths {input.dna_lengths} \
+               --query-protein-lengths {input.protein_lengths} \
                --output-base {params.out_base} 2> {log}
         """
