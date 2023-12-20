@@ -1,0 +1,56 @@
+msl_files:
+  - name: MSL38.v3
+    year: 2022
+    url: https://ictv.global/msl/current
+    msl: "MSL"
+    changelog: "Taxa Renamed in MSL38"
+  - name: MSL38.v2
+    year: 2022
+    url: https://ictv.global/filebrowser/download/12337 
+    msl: "MSL"
+    changelog: "Taxa Renamed in MSL38"
+  - name: MSL38.v1
+    year: 2022
+    url: https://ictv.global/filebrowser/download/11621 
+    msl: "MSL"
+    changelog: "Taxa Renamed in MSL38"
+  - name: MSL37.v3
+    year: 2021
+    url: https://ictv.global/proposal/MSL37
+    msl: "ICTV2020 Master Species List#37"
+  - name: MSL37.v2
+    year: 2021
+    url: https://ictv.global/filebrowser/download/6719
+    msl: "ICTV2020 Master Species List#37"
+  - name: MSL37.v1
+    year: 2021
+    url: https://ictv.global/filebrowser/download/583
+    msl: "ICTV2021 Master Species List#37"
+  - name: MSL36
+    year: 2020 
+    url: https://ictv.global/filebrowser/download/476
+    msl: "ICTV2020 Master Species List#36"
+  - name: MSL35
+    year: 2019
+    url: https://ictv.global/filebrowser/download/487
+    msl: "ICTV2019 Master Species List#35"
+  - name: MSL34
+    year: 2018
+    url: https://ictv.global/filebrowser/download/489
+    msl: "ICTV 2018b Master Species #34 v" 
+  - name: MSL33
+    year: 2018
+    url: https://ictv.global/filebrowser/download/483
+    msl: "ICTV 2018 Master Species #33"
+  - name: MSL32
+    year: 2017
+    url: https://ictv.global/filebrowser/download/477 
+    msl: "ICTV 2017 Master Species #32"
+  - name: MSL31
+    year: 2016
+    url: https://ictv.global/filebrowser/download/484
+    msl: "ICTV 2016 Master Species #31" 
+  - name: MSL30
+    year: 2015
+    url: https://ictv.global/filebrowser/download/479
+    msl: "ICTV 2015 Master Species #30" 

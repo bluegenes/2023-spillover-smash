@@ -7,3 +7,7 @@ outputs/*
 *.sig
 .snakemake
 logs/*
+*csv
+*tsv
+*/
+*xls*

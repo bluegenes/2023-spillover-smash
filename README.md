@@ -2,7 +2,7 @@
 
 This is a workflow to reclassify the SpillOver sequences using all ICTV genomes. It relies on snakemake for automation and conda for software management. 
 
-## Build ICTV Database
+## Build ICTV-VMR Database
 
 ### Find Corresponding 'Assembly' datasets
 
@@ -30,11 +30,11 @@ Exceptions:
 
 ### Download Viral Assemblies and build a `sourmash` database
 
-With assembly accessions in hand, we now download all viral genomes from NCBI and index them as a sourmash database. We use the file generated above as input into the `dl-sketch.ICTV.smk` snakefile. 
+With assembly accessions in hand, we now download all viral genomes from NCBI and index them as a sourmash database. We use the file generated above as input into the `prepare-vmr.smk` snakefile.
 
 This is currently written to download and sketch all available assembly accessions, but we may want to build a smaller database containing only the `exemplar` genomes, leaving out the `additional` isolates. In the `VMR_21-221122_MSL37.csv` file, there are 10435 Exemplar and 1626 'Additional'.
 
-Issues:
+Initial Issues:
 - Ran into an exception during download: GCA_004789135.1 is supressed. For now, manually removed from accession file. In the future, need programmatic query for determining whether record has been supressed -- should be feasible to add to the first step, where we use biopython entrez to link assembly identifiers.
 - 6 records have duplicate entries in the csv file:
   > - GCF_001041915.1 Mycobacterium phage Fionnbharth
@@ -46,6 +46,7 @@ Issues:
   
   > Since the duplicated entries in the `fromfile.csv` file are identical, they were removed via `awk '!x[$0]++' $filename > $filename-new` for now. This should be automated in the future.
 
+This was later solved by curating assemblies from the provided Nucleotide Accessions.
 
 ## Build SpillOver Database
 

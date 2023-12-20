@@ -140,7 +140,7 @@ rule diamond_blastx:
     shell:
         """
         diamond blastx --query {input.query} --db {input.index} \
-                       --out {output.results} --sensitive \
+                       --out {output.results} --ultra-sensitive \
                        --threads {threads} 2> {log}
         """
 
