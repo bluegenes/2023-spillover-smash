@@ -47,16 +47,13 @@ def construct_graph(pairwise_file, threshold, similarity_column="ANI", ksize=31,
                     nodes_to_add.add(current_id)
                     current_id += 1
 
-            if len(nodes_to_add) > batch_len:
-                for node_id in nodes_to_add:
-                    graph.add_node(node_id)
-                nodes_to_add.clear()
-
             query_id = name_to_id[query_name]
             match_id = name_to_id[match_name]
 
             edges.append((query_id, match_id, similarity))
             if len(edges) >= batch_len:
+                graph.add_nodes_from(list(nodes_to_add))
+                nodes_to_add.clear()
                 graph.add_edges_from(edges)
                 edges.clear()
 
