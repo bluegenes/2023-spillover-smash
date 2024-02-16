@@ -1,4 +1,4 @@
-name: reports
+name: spillover-reports
 channels:
   - conda-forge
   - bioconda
@@ -6,7 +6,8 @@ channels:
 dependencies:
   - python=3.10
   #- sourmash>=4.8.2,<5
-  - pandas>=2,<3
+  - pandas>=2.1.1,<3
+  - numpy
   - jupyterlab
   - pip
   - pip:
