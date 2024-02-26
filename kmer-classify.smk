@@ -33,35 +33,36 @@ dna_params = expand(f"{basename}-x-{db_basename}.dna.k{{k}}-sc{{scaled}}.t{{thre
 prot_params = expand(f"{basename}-x-{db_basename}.protein.k{{k}}-sc{{scaled}}.t{{thresh}}", k=params['protein']['ksize'], 
                                                                                             scaled=params['protein']['scaled'],
                                                                                             thresh=params['protein']['threshold_bp'])
-all_params = prot_params
-# all_params = dna_params + prot_params
+# all_params = prot_params
+all_params = dna_params + prot_params
 
 
 rule all:
     input:
-        expand(f"{out_dir}/fastmultigather/{{search_params}}.gather.csv", search_params = all_params), 
-        expand(f"{out_dir}/fastmultigather/{{search_params}}.gather.with-lineages.csv", search_params = all_params), 
+        expand(f"{out_dir}/fastmultigather/{{search_params}}.fmgather.csv", search_params = all_params), 
+        expand(f"{out_dir}/fastmultigather/{{search_params}}.fmgather.with-lineages.csv", search_params = all_params), 
+        expand(f"{out_dir}/fastmultigather/{{search_params}}.classifications.csv", search_params=all_params),
 
 
 rule index_database:
     input:
         db_zip = "output.vmr/{db_basename}.{moltype}.zip"
     output:
-        db_rocksdb = directory("output.vmr/{db_basename}.{moltype}-k{ksize}.rocksdb"),
-        current_file = "output.vmr/{db_basename}.{moltype}-k{ksize}.rocksdb/CURRENT",
+        db_rocksdb = directory("output.vmr/{db_basename}.{moltype}-k{ksize}-sc{scaled}.rocksdb"),
+        current_file = "output.vmr/{db_basename}.{moltype}-k{ksize}-sc{scaled}.rocksdb/CURRENT",
     conda: "conf/env/branchwater.yml"
     log: f"{logs_dir}/index/{{db_basename}}.{{moltype}}-k{{ksize}}.index.log"
     threads: 1
     shell:
         """
         sourmash scripts index {input.db_zip} -m {wildcards.moltype} \
-                               -k {wildcards.ksize} --scaled 1 -o {output.db_rocksdb} 2> {log}
+                               -k {wildcards.ksize} --scaled {wildcards.scaled} -o {output.db_rocksdb} 2> {log}
         """
 
 rule sourmash_fastmultigather:
     input:
         query_zip = f"{out_dir}/{{basename}}.{{moltype}}.zip",
-        database  = "output.vmr/{db_basename}.{moltype}-k{ksize}.rocksdb/CURRENT",
+        database  = "output.vmr/{db_basename}.{moltype}-k{ksize}-sc{scaled}.rocksdb/CURRENT",
     output:
         f"{out_dir}/fastmultigather/{{basename}}-x-{{db_basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.t{{threshold}}.gather.csv",
     resources:
@@ -73,7 +74,7 @@ rule sourmash_fastmultigather:
     benchmark: f"{logs_dir}/fastmultigather/{{basename}}-x-{{db_basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.t{{threshold}}.benchmark"
     conda: "conf/env/branchwater.yml"
     params:
-        db_dir = lambda w: f'output.vmr/{w.db_basename}.{w.moltype}-k{w.ksize}.rocksdb',
+        db_dir = lambda w: f'output.vmr/{w.db_basename}.{w.moltype}-k{w.ksize}-sc{w.scaled}.rocksdb',
     shell:
         """
         echo "DB: {params.db_dir}"
@@ -105,4 +106,26 @@ rule tax_annotate:
         sourmash tax annotate -g {input.gather_csv} \
                               -t {input.lineages} \
                               --ictv -o {params.output_dir} 2> {log}
+        """
+
+rule tax_genome:
+    input:
+        gather_csv = f"{out_dir}/fastmultigather/{{basename}}-x-{{db_basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.t{{threshold}}.gather.csv",
+        lineages = TAX_FILE,
+    output:
+        f"{out_dir}/fastmultigather/{{basename}}-x-{{db_basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.t{{threshold}}.classifications.csv",
+    resources:
+        mem_mb=lambda wildcards, attempt: attempt *3000,
+        partition = "low2",
+        time=240,
+    conda: "conf/env/sourmash-ictv.yml"
+    log: f"{logs_dir}/tax/{{basename}}-x-{{db_basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.t{{threshold}}.ictv.log"
+    benchmark: f"{logs_dir}/tax/{{basename}}-x-{{db_basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.t{{threshold}}.ictv.benchmark"
+    params:
+        output_dir = f"{out_dir}/fastmultigather",
+    shell:
+        """
+        sourmash tax genome -g {input.gather_csv} \
+                            -t {input.lineages} \
+                            --ictv -o {params.output_dir} 2> {log}
         """
