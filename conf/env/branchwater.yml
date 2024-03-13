@@ -6,11 +6,7 @@ channels:
 dependencies:
   - python=3.10
   - sourmash>=4.8.4,<5
-  #- sourmash_plugin_branchwater=0.9.0
+  - sourmash_plugin_branchwater=0.9.1
   - rust
   - gcc_linux-64
   - gxx_linux-64
-  - pip
-  - pip:
-    - git+https://github.com/dib-lab/pyo3_branchwater@add-cluster
-    #- git+https://github.com/sourmash-bio/pyo3_branchwater.git#egg=pyo3_branchwater

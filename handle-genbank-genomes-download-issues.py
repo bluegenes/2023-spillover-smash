@@ -1,3 +1,12 @@
+###
+# In some cases, the file info.csv contains incorrect links to the genomic.fna.gz files.
+# Since re-running `genbank_genomes.py` produces correct links, my guess is that the
+# locations of these genome directories changed since original download of info.csv. 
+#
+# This script identifies info.csv files without corresponding genomic.fna.gz files,
+# and optionally deletes them so they can be regenerated.
+#
+###
 import os
 import argparse
 
