@@ -44,10 +44,7 @@ def main(args):
 
             # make output file for this input
             out_base = os.path.basename(in_csv.rsplit(".csv")[0])
-            this_outfile, _ = sourmash.tax.make_outfile(
-                out_base, "annotate", output_dir=args.output_dir
-            )
-
+            this_outfile = os.path.join(args.out_dir, out_base, ".with-lineages.csv")
             out_header = header + ["lineage"]
 
             with sourmash.FileOutputCSV(this_outfile) as out_fp:
