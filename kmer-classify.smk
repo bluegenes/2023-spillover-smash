@@ -16,6 +16,9 @@ params = {"dna": {"ksize": [21,31], "scaled": 1, "threshold_bp": 3},
           "protein": {"ksize": [7, 10], "scaled": 1, "threshold_bp": 5}} #, 6,10
 
 TAX_FILE = 'output.vmr/vmr_MSL38_v1.taxonomy.csv'
+ANI_THRESHOLD = 0.95
+# AAI_THRESHOLD = 0.8 # for protein
+
 
 onstart:
     print("------------------------------")
@@ -37,8 +40,8 @@ prot_params = expand(f"{basename}-x-{db_basename}.protein.k{{k}}-sc{{scaled}}.t{
                                                                                             scaled=params['protein']['scaled'],
                                                                                             thresh=params['protein']['threshold_bp'])
 # all_params = prot_params
-all_params = dna_params + prot_params
 # all_params = dna_params
+all_params = dna_params + prot_params
 
 
 rule all:
@@ -46,6 +49,11 @@ rule all:
         expand(f"{out_dir}/fastmultigather/{{search_params}}.fmgather.csv", search_params = all_params), 
         expand(f"{out_dir}/fastmultigather/{{search_params}}.fmgather.with-lineages.csv", search_params = all_params), 
         expand(f"{out_dir}/fastmultigather/{{search_params}}.classifications.csv", search_params=all_params),
+        expand(f"{out_dir}/spillover.{{moltype}}.pairwise.csv", moltype=["dna", "protein"]),
+        expand(f"{out_dir}/spillover.dna.cluster.t{{threshold}}.csv", threshold = ANI_THRESHOLD),
+        expand(f"{out_dir}/spillover.protein.cluster.t{{threshold}}.csv", threshold = AAI_THRESHOLD),
+        expand(f"{out_dir}/spillover.dna.cluster.t{{threshold}}.with-lineages.csv", threshold = ANI_THRESHOLD),
+        expand(f"{out_dir}/spillover.protein.cluster.t{{threshold}}.with-lineages.csv", threshold = AAI_THRESHOLD),
 
 
 rule index_database:
@@ -143,4 +151,62 @@ rule tax_genome:
                             -t {input.lineages} \
                             --ictv -o {params.output_dir} \
                             --ani-threshold 0.2 --force  2> {log}
+        """
+
+rule spillover_pairwise:
+    input:
+        spillover_zip = f"{out_dir}/{{basename}}.{{moltype}}.zip",
+    output:
+        f"{out_dir}/spillover.{{moltype}}.pairwise.csv",
+    resources:
+        mem_mb=lambda wildcards, attempt: attempt *20000,
+        partition="low2",
+        time=240,
+    conda: "conf/env/branchwater.yml"
+    log: f"{logs_dir}/pairwise/spillover.{{moltype}}.pairwise.log"
+    benchmark: f"{logs_dir}/pairwise/spillover.{{moltype}}.pairwise.benchmark"
+    shell:
+        """
+        sourmash scripts pairwise {input.spillover_zip} --ani \
+                                  --write-all -o {output} 2> {log}
+        """
+
+rule spillover_cluster:
+    input:
+        pairwise: f"{out_dir}/spillover.{{moltype}}.pairwise.csv",
+    output:
+        f"{out_dir}/spillover.{{moltype}}.cluster.t{threshold}.csv",
+    resources:
+        mem_mb=lambda wildcards, attempt: attempt *20000,
+        partition="low2",
+        time=240,
+    conda: "conf/env/branchwater.yml"
+    log: f"{logs_dir}/cluster/spillover.{{moltype}}.cluster.t{threshold}.log"
+    benchmark: f"{logs_dir}/cluster/spillover.{{moltype}}.cluster.t{threshold}.benchmark"
+    shell:
+        """
+        sourmash scripts cluster {input.pairwise} --threshold {wildcards.threshold} \
+                                 -o {output} 2> {log}
+        """
+
+rule annotate_clusters:
+    input:
+        cluster_csv = f"{out_dir}/spillover.{{moltype}}.cluster.t{threshold}.csv",
+        lineages = TAX_FILE,
+    output:
+        f"{out_dir}/spillover.{{moltype}}.cluster.t{threshold}.with-lineages.csv"
+    resources:
+        mem_mb=lambda wildcards, attempt: attempt *3000,
+        partition = "low2",
+        time=240,
+    conda: "conf/env/branchwater.yml"
+    log: f"{logs_dir}/cluster/spillover.cluster.t{threshold}.annotate.log"
+    benchmark: f"{logs_dir}/cluster/spillover.cluster.t{threshold}.annotate.benchmark"
+    params:
+        output_dir = f"{out_dir}",
+    shell:
+        """
+        python annotate-clusters.py {input.cluster_csv} \
+                                    -t {input.lineages} \
+                                    --ictv -o {params.output_dir} 2> {log}
         """
