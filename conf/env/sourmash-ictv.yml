@@ -7,4 +7,4 @@ dependencies:
   - python=3.12
   - pip
   - pip:
-    - git+https://github.com/dib-lab/sourmash@expand-tax-force
+    - git+https://github.com/dib-lab/sourmash@latest

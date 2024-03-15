@@ -14,9 +14,9 @@ def main(args):
     """
 
     # load taxonomic assignments
-    tax_assign = tax_utils.MultiLineageDB.load_from_gather_with_lineages(args.taxonomy_csv, keep_full_identifiers=False,
-                                                               keep_identifier_versions=False, force=args.force,
-                                                               lins=args.lins, ictv=args.ictv)
+    tax_assign = tax_utils.MultiLineageDB.load([args.taxonomy_csv], keep_full_identifiers=False,
+                                                keep_identifier_versions=False, force=args.force,
+                                                lins=args.lins, ictv=args.ictv)
 
     if not tax_assign:
         error(

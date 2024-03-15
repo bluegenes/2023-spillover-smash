@@ -12,8 +12,10 @@ db_dir = "output.vmr"
 sp_fromfile = 'output.spillover/spillover.fromfile.csv'
 sp = pd.read_csv(sp_fromfile)
 
-params = {"dna": {"ksize": [21,31], "scaled": 1, "threshold_bp": 3},
-          "protein": {"ksize": [7, 10], "scaled": 1, "threshold_bp": 5}} #, 6,10
+SCALED = 1
+THRESHOLD_BP = 3* SCALED
+params = {"dna": {"ksize": [21,31], "scaled": SCALED, "threshold_bp": THRESHOLD_BP},
+          "protein": {"ksize": [7, 10], "scaled": SCALED, "threshold_bp": THRESHOLD_BP}} #, 6,10
 
 TAX_FILE = 'output.vmr/vmr_MSL38_v1.taxonomy.csv'
 ANI_THRESHOLD = [0.95, 0.9]
@@ -42,6 +44,8 @@ prot_params = expand(f"protein.k{{k}}-sc{{scaled}}", k=params['protein']['ksize'
 all_params = dna_params
 # all_params = dna_params + prot_params
 
+wildcard_constraints:
+    ani_threshold="[0-9]+(?:\.[0-9]+)?"
 
 rule all:
     input:
@@ -52,8 +56,8 @@ rule all:
         expand(f"{out_dir}/fastmultigather/{basename}-x-{db_basename}.{{search_params}}.t{{thresh}}.classifications.csv", search_params=dna_params, thresh = params['dna']['threshold_bp']),
         expand(f"{out_dir}/fastmultigather/{basename}-x-{db_basename}.{{search_params}}.t{{thresh}}.classifications.csv", search_params=prot_params, thresh = params['protein']['threshold_bp']),
         expand(f"{out_dir}/{basename}.{{search_params}}.pairwise.csv", search_params=all_params),
+        expand(f"{out_dir}/{basename}.{{dna_params}}.cluster.ani-t{{threshold}}.with-lineages.csv", dna_params=dna_params, threshold=ANI_THRESHOLD),
         expand(f"{out_dir}/{basename}.{{dna_params}}.cluster.ani-t{{threshold}}.csv", dna_params=dna_params, threshold=ANI_THRESHOLD),
-        # expand(f"{out_dir}/{basename}.{{dna_params}}.cluster.ani-t{{threshold}}.with-lineages.csv", dna_params=dna_params, threshold=ANI_THRESHOLD),
         # expand(f"{out_dir}/{basename}.{{prot_params}}.cluster.ani-t{{threshold}}.csv", prot_params=prot_params, threshold=AAI_THRESHOLD),
         # expand(f"{out_dir}/{basename}.{{prot_params}}.cluster.ani-t{{threshold}}.with-lineages.csv", prot_params=prot_params, threshold=AAI_THRESHOLD),
 
@@ -179,18 +183,18 @@ rule spillover_cluster:
     input:
         pairwise= f"{out_dir}/{{basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.pairwise.csv",
     output:
-        clusters =f"{out_dir}/{{basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.cluster.ani-t{{threshold}}.csv",
-        cluster_sizes = f"{out_dir}/{{basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.cluster.ani-t{{threshold}}.counts.csv"
+        clusters =f"{out_dir}/{{basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.cluster.ani-t{{ani_threshold}}.csv",
+        cluster_sizes = f"{out_dir}/{{basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.cluster.ani-t{{ani_threshold}}.counts.csv"
     resources:
         mem_mb=lambda wildcards, attempt: attempt *20000,
         partition="low2",
         time=240,
     conda: "conf/env/branchwater.yml"
-    log: f"{logs_dir}/cluster/{{basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.cluster.ani-t{{threshold}}.log"
-    benchmark: f"{logs_dir}/cluster/{{basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.cluster.ani-t{{threshold}}.benchmark"
+    log: f"{logs_dir}/cluster/{{basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.cluster.ani-t{{ani_threshold}}.log"
+    benchmark: f"{logs_dir}/cluster/{{basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.cluster.ani-t{{ani_threshold}}.benchmark"
     shell:
         """
-        sourmash scripts cluster {input.pairwise} --threshold {wildcards.threshold} \
+        sourmash scripts cluster {input.pairwise} --threshold {wildcards.ani_threshold} \
                                  --similarity-column average_containment_ani \
                                  --cluster-sizes {output.cluster_sizes} \
                                  -o {output.clusters} 2> {log}
@@ -198,22 +202,22 @@ rule spillover_cluster:
 
 rule annotate_clusters:
     input:
-        cluster_csv = f"{out_dir}/{{basename}}.{{moltype}}.cluster.t{{threshold}}.csv",
-        fastmultigather_lineages = f"{out_dir}/fastmultigather/{{basename}}-x-{{db_basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.t{{threshold}}.fmgather.with-lineages.csv",
+        cluster_csv = f"{out_dir}/{{basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.cluster.ani-t{{ani_threshold}}.csv", 
+        fastmultigather_lineages = f"{out_dir}/fastmultigather/{basename}-x-{db_basename}.{{moltype}}.k{{ksize}}-sc{{scaled}}.t{THRESHOLD_BP}.fmgather.with-lineages.csv",
     output:
-        f"{out_dir}/{{basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.cluster.t{{threshold}}.with-lineages.csv"
+        f"{out_dir}/{{basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.cluster.ani-t{{ani_threshold}}.with-lineages.csv"
     resources:
         mem_mb=lambda wildcards, attempt: attempt *3000,
         partition = "low2",
         time=240,
-    conda: "conf/env/branchwater.yml"
-    log: f"{logs_dir}/cluster/{{basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.cluster.t{{threshold}}.annotate.log"
-    benchmark: f"{logs_dir}/cluster/{{basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.cluster.t{{threshold}}.annotate.benchmark"
+    conda: "conf/env/sourmash-ictv.yml"
+    log: f"{logs_dir}/cluster/{{basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.cluster.ani-t{{ani_threshold}}.annotate.log"
+    benchmark: f"{logs_dir}/cluster/{{basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.cluster.ani-t{{ani_threshold}}.annotate.benchmark"
     params:
         output_dir = f"{out_dir}",
     shell:
         """
         python annotate-clusters.py {input.cluster_csv} \
-                                    -t {input.lineages} \
+                                    -t {input.fastmultigather_lineages} \
                                     --ictv -o {params.output_dir} 2> {log}
         """
