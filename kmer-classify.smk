@@ -53,7 +53,9 @@ rule all:
         expand(f"{out_dir}/fastmultigather/{basename}-x-{db_basename}.{{search_params}}.t{{thresh}}.classifications.csv", search_params=prot_params, thresh = params['protein']['threshold_bp']),
         expand(f"{out_dir}/{basename}.{{search_params}}.pairwise.csv", search_params=all_params),
         expand(f"{out_dir}/{basename}.{{dna_params}}.cluster.ani-t{{threshold}}.csv", dna_params=dna_params, threshold=ANI_THRESHOLD),
+        # expand(f"{out_dir}/{basename}.{{dna_params}}.cluster.ani-t{{threshold}}.with-lineages.csv", dna_params=dna_params, threshold=ANI_THRESHOLD),
         # expand(f"{out_dir}/{basename}.{{prot_params}}.cluster.ani-t{{threshold}}.csv", prot_params=prot_params, threshold=AAI_THRESHOLD),
+        # expand(f"{out_dir}/{basename}.{{prot_params}}.cluster.ani-t{{threshold}}.with-lineages.csv", prot_params=prot_params, threshold=AAI_THRESHOLD),
 
 
 rule index_database:
@@ -177,7 +179,8 @@ rule spillover_cluster:
     input:
         pairwise= f"{out_dir}/{{basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.pairwise.csv",
     output:
-        f"{out_dir}/{{basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.cluster.ani-t{{threshold}}.csv",
+        clusters =f"{out_dir}/{{basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.cluster.ani-t{{threshold}}.csv",
+        cluster_sizes = f"{out_dir}/{{basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.cluster.ani-t{{threshold}}.counts.csv"
     resources:
         mem_mb=lambda wildcards, attempt: attempt *20000,
         partition="low2",
@@ -188,8 +191,9 @@ rule spillover_cluster:
     shell:
         """
         sourmash scripts cluster {input.pairwise} --threshold {wildcards.threshold} \
-                                 --average-containment-ani \
-                                 -o {output} 2> {log}
+                                 --similarity-column average_containment_ani \
+                                 --cluster-sizes {output.cluster_sizes} \
+                                 -o {output.clusters} 2> {log}
         """
 
 rule annotate_clusters:
