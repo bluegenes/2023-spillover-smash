@@ -13,95 +13,129 @@ def main(args):
     Annotate cluster results with LCA taxonomic lineage.
     """
 
-    # load taxonomic assignments
-    tax_assign = tax_utils.MultiLineageDB.load([args.taxonomy_csv], keep_full_identifiers=False,
-                                                keep_identifier_versions=False, force=args.force,
-                                                lins=args.lins, ictv=args.ictv)
+    # load reference taxonomic assignments
+    # tax_assign = tax_utils.MultiLineageDB.load([args.taxonomy_csv], keep_full_identifiers=False,
+    #                                             keep_identifier_versions=False, force=args.force,
+    #                                             lins=args.lins, ictv=args.ictv)
 
-    if not tax_assign:
-        error(
-            f'ERROR: No taxonomic assignments loaded from {",".join(args.taxonomy_csv)}. Exiting.'
-        )
-        sys.exit(-1)
+    # if not tax_assign:
+    #     error(
+    #         f'ERROR: No taxonomic assignments loaded from {",".join(args.taxonomy_csv)}. Exiting.'
+    #     )
+    #     sys.exit(-1)
+    with sourmash.sourmash_args.FileInputCSV(args.taxonomy_csv) as r:
+        header = r.fieldnames
+        # check for empty file
+        if not header:
+            notify(f"Cannot read from '{args.taxonomy_csv}'. Is file empty?")
+            sys.exit(-1)
 
-    # get csv from args
-    input_csvs = tax_utils.collect_gather_csvs(args.cluster_csv)
+        # check cluster file
+        if 'query_name' not in header or 'lineage' not in header:
+            notify(f"Either 'query_name' or 'lineage' column missing. Is {args.taxonomy_csv} an annotated gather file?")
+            sys.exit(-1)
 
-    # handle each gather csv separately
-    for n, in_csv in enumerate(input_csvs):
-        # Check for a column we can use to find lineage information:
-        with sourmash.FileInputCSV(in_csv) as r:
-            header = r.fieldnames
-            # check for empty file
-            if not header:
-                notify(f"Cannot read from '{in_csv}'. Is file empty?")
-                sys.exit(-1)
+        # Create a dictionary called tax_assign to store query_name to lineage mapping
+        tax_assign = {}
 
-            # check cluster file
-            if 'nodes' not in header:
-                notify(f"no 'nodes' column. Is this {in_csv} cluster file?")
-                sys.exit(-1)
+        # Iterate over each row in the reader
+        for row in r:
+            # Get the query_name and lineage from the row
+            # query_name = row['query_name']
+            # lineage = row['lineage']
 
-            # make output file for this input
-            out_base = os.path.basename(in_csv.rsplit(".csv")[0])
-            this_outfile = os.path.join(args.out_dir, out_base, ".with-lineages.csv")
-            out_header = header + ["lineage"]
+            # Add the mapping to the tax_assign dictionary
+            ident = sourmash.tax.tax_utils.get_ident(row['query_name'])
+            tax_assign[ident] = row['lineage']
 
-            with sourmash.FileOutputCSV(this_outfile) as out_fp:
-                w = csv.DictWriter(out_fp, out_header)
-                w.writeheader()
+    # Check for a column we can use to find lineage information:
+    with sourmash.sourmash_args.FileInputCSV(args.cluster_csv) as r:
+        header = r.fieldnames
+        # check for empty file
+        if not header:
+            notify(f"Cannot read from '{args.cluster_csv}'. Is file empty?")
+            sys.exit(-1)
 
-                n = 0
-                n_missed = 0
-                rows_missed = 0
-                for n, row in enumerate(r):
-                    # find annotation for each node in the cluster, then take LCA.
-                    cluster_annot = set()
-                    nodes = row['nodes'] # should be the list of queries in this cluster
-                    for node in nodes:
-                        # find lineage and write annotated row
-                        lineage=None
-                        lin = tax_assign.get(node)
-                        if lin:
-                            if args.lins:
-                                lineage = tax_utils.LINLineageInfo()
-                            elif args.ictv:
-                                lineage = tax_utils.ICTVRankLineageInfo()
-                            else:
-                                lineage = tax_utils.RankLineageInfo()
-                            # add match lineage to cluster_annot
-                            cluster_annot.add(lineage)
+        # check cluster file
+        if 'nodes' not in header:
+            notify(f"no 'nodes' column. Is this {args.cluster_csv} cluster file?")
+            sys.exit(-1)
+
+        # make output file for this input
+        out_base = os.path.basename(args.cluster_csv.rsplit(".csv")[0])
+        this_outfile = os.path.join(args.output_dir, out_base + ".with-lineages.csv")
+        out_header = header + ["lineage"]
+
+        with sourmash.sourmash_args.FileOutputCSV(this_outfile) as out_fp:
+            w = csv.DictWriter(out_fp, out_header)
+            w.writeheader()
+
+            n = 0
+            n_missed = 0
+            rows_missed = 0
+            for n, row in enumerate(r):
+                # find annotation for each node in the cluster, then take LCA.
+                cluster_annot = set()
+                nodes = row['nodes'] # should be the list of queries in this cluster
+                for node in nodes.split(';'):
+                    # find lineage and write annotated row
+                    lineage=None
+                    lin = tax_assign.get(node)
+                    if lin:
+                        if args.lins:
+                            lineage = tax_utils.LINLineageInfo(lineage_str=lin)
+                        elif args.ictv:
+                            lineage = tax_utils.ICTVRankLineageInfo(lineage_str=lin)
                         else:
-                            n_missed += 1
-
-                    # get LCA of the node taxonomic assignments
-                    if len(cluster_annot) == 0:
-                        rows_missed +=1
-                        continue
-                    elif len(cluster_annot) > 1:
-                        lin_tree = sourmash.tax.LineageTree().add_lineages(cluster_annot)
-                        lca_lin = lin_tree.find_lca()
+                            lineage = tax_utils.RankLineageInfo(lineage_str=lin)
+                        # add match lineage to cluster_annot
+                        cluster_annot.add(lineage)
                     else:
-                        lca_lin = cluster_annot[0]
+                        n_missed += 1
 
-                    # writerow
-                    row["lineage"] = lca_lin.display_lineage()
-
-                    # write row to output
-                    w.writerow(row)
-
-                rows_annotated = (n + 1) - rows_missed
-                if n_missed:
-                    notify(f"Missed {n_missed} taxonomic assignments during annotation.")
-                if not rows_annotated:
-                    notify(
-                        f"Could not annotate any rows from '{in_csv}'."
-                    )
-                    sys.exit(-1)
+                # get LCA of the node taxonomic assignments
+                if len(cluster_annot) == 0:
+                    rows_missed +=1
+                    continue
+                elif len(cluster_annot) > 1:
+                    lin_tree = sourmash.tax.tax_utils.LineageTree(cluster_annot)
+                    lca_lin = lin_tree.find_lca()
                 else:
-                    notify(
-                        f"Annotated {rows_annotated} of {n+1} total rows from '{in_csv}'."
-                    )
+                    lca_lin = (list(cluster_annot)[0], 0)
+
+                for lin in cluster_annot:
+                    print(lin.display_lineage())
+                print(lca_lin)
+                # writerow
+                # ARGH, make it into a lineage again.
+                lca_lineage = lca_lin[0]
+                lineage = ""
+                if lca_lineage:
+                    if args.lins:
+                        lineage = tax_utils.LINLineageInfo(lineage=lca_lineage)
+                    elif args.ictv:
+                        lineage = tax_utils.ICTVRankLineageInfo(lineage=lca_lineage)
+                    else:
+                        lineage = tax_utils.RankLineageInfo(lineage=lca_lineage)
+
+                row["lineage"] = lineage
+                print(lineage)
+
+                # write row to output
+                w.writerow(row)
+
+            rows_annotated = (n + 1) - rows_missed
+            if n_missed:
+                notify(f"Missed {n_missed} taxonomic assignments during annotation.")
+            if not rows_annotated:
+                notify(
+                    f"Could not annotate any rows from '{args.cluster_csv}'."
+                )
+                sys.exit(-1)
+            else:
+                notify(
+                    f"Annotated {rows_annotated} of {n+1} total rows from '{args.cluster_csv}'."
+                )
 
 
 if __name__ == "__main__":
