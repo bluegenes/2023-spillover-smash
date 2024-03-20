@@ -13,16 +13,6 @@ def main(args):
     Annotate cluster results with LCA taxonomic lineage.
     """
 
-    # load reference taxonomic assignments
-    # tax_assign = tax_utils.MultiLineageDB.load([args.taxonomy_csv], keep_full_identifiers=False,
-    #                                             keep_identifier_versions=False, force=args.force,
-    #                                             lins=args.lins, ictv=args.ictv)
-
-    # if not tax_assign:
-    #     error(
-    #         f'ERROR: No taxonomic assignments loaded from {",".join(args.taxonomy_csv)}. Exiting.'
-    #     )
-    #     sys.exit(-1)
     with sourmash.sourmash_args.FileInputCSV(args.taxonomy_csv) as r:
         header = r.fieldnames
         # check for empty file
@@ -35,15 +25,10 @@ def main(args):
             notify(f"Either 'query_name' or 'lineage' column missing. Is {args.taxonomy_csv} an annotated gather file?")
             sys.exit(-1)
 
-        # Create a dictionary called tax_assign to store query_name to lineage mapping
         tax_assign = {}
 
         # Iterate over each row in the reader
         for row in r:
-            # Get the query_name and lineage from the row
-            # query_name = row['query_name']
-            # lineage = row['lineage']
-
             # Add the mapping to the tax_assign dictionary
             ident = sourmash.tax.tax_utils.get_ident(row['query_name'])
             tax_assign[ident] = row['lineage']
@@ -103,23 +88,24 @@ def main(args):
                 else:
                     lca_lin = (list(cluster_annot)[0], 0)
 
-                for lin in cluster_annot:
-                    print(lin.display_lineage())
-                print(lca_lin)
-                # writerow
-                # ARGH, make it into a lineage again.
+                # ARGH, LineageTree is designed to work with original lineage tuples too, so returns a tuple result, not a LineageInfo class. Convert back.
+                # to do: modify LineageTree to just work with LineageInfo classes, and always return a LineageInfo class.
                 lca_lineage = lca_lin[0]
                 lineage = ""
-                if lca_lineage:
+                if lca_lineage!= ():
                     if args.lins:
-                        lineage = tax_utils.LINLineageInfo(lineage=lca_lineage)
+                        if not isinstance(lca_lineage, tax_utils.LINLineageInfo):
+                            lca_lineage = tax_utils.LINLineageInfo(lineage=lca_lineage)
                     elif args.ictv:
-                        lineage = tax_utils.ICTVRankLineageInfo(lineage=lca_lineage)
+                        if not isinstance(lca_lineage, tax_utils.ICTVRankLineageInfo):
+                            lca_lineage = tax_utils.ICTVRankLineageInfo(lineage=lca_lineage)
                     else:
-                        lineage = tax_utils.RankLineageInfo(lineage=lca_lineage)
+                        if not isinstance(lca_lineage, tax_utils.RankLineageInfo):
+                            lca_lineage = tax_utils.RankLineageInfo(lineage=lca_lineage)
+                    # display lineage
+                    lineage = lca_lineage.display_lineage()
 
                 row["lineage"] = lineage
-                print(lineage)
 
                 # write row to output
                 w.writerow(row)
@@ -142,7 +128,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Annotate cluster results with LCA taxonomic lineage.")
     parser.add_argument("cluster_csv", help="Path to the cluster CSV file.")
     parser.add_argument("-t", "--taxonomy_csv", help="Path to the taxonomy CSV file.")
-    parser.add_argument("-o", "--output_dir", help="Output directory for annotated CSV files.", default=".")
+    parser.add_argument("-o", "--output-dir", help="Output directory for annotated CSV files.", default=".")
     parser.add_argument("-f", "--force", help="Force loading taxonomic assignments.", action="store_true")
     parser.add_argument("--lins", help="Use LIN taxonomic assignments.", action="store_true")
     parser.add_argument("--ictv", help="Use ICTV taxonomic assignments.", action="store_true")
