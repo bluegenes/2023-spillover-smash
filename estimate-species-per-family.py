@@ -38,16 +38,15 @@ def count_per_family(annotationD, count_rank = 'species'):
     count the number of viruses (name) and count_rank (default species)
     per viral family
     '''
-    virusLineageD = defaultdict(lambda: Counter())
-    rankLineageD = defaultdict(lambda: Counter())
+    lineageCountsD = defaultdict(lambda: {'species': Counter(), 'name': Counter()})
 
     for _, lineage_info in annotationD.items():
         family_lineage = lineage_info.pop_to_rank('family')
         rank_lineage = lineage_info.pop_to_rank(count_rank)
-        virusLineageD[family_lineage][lineage_info] += 1 # keep track of how many times we saw each name
-        rankLineageD[family_lineage][rank_lineage] += 1 # keep track of how many times we saw each RANK-level annot
+        lineageCountsD[family_lineage][count_rank][rank_lineage] += 1
+        lineageCountsD[family_lineage]['virus'][lineage_info] += 1
 
-    return rankLineageD
+    return lineageCountsD
 
 
 # Main function to process the file and output results
@@ -70,31 +69,19 @@ def main(args):
             prot_annot = prot_fmg.get(ident, '')
             prot_cluster_annot = prot_cluster(ident, '')
 
-            # to do: combine annotations properly
+            # to do: combine annotations properly (LCA as needed)
             annotD[ident] = dna_annot
     
-    virus_counts, rank_counts = count_per_family(annotD, args.rank)
-
-
+    # count n unique virus, spp per family
+    countsD = count_per_family(annotD, args.rank)
     with open(args.output_csv, 'w', newline='') as outfile:
-        writer = csv.writer(outfile)
-        writer.writerow(['family_lineage', 'n_unique_species'])
-        # writer.writerow(['family_lineage', 'unique_species_counts', 'species_with_counts'])
-
-        for family_lin, species_counter in rankLineageDict.items():
-            n_unique_species = len(species_counter)
-            # species_counts_str = ";".join([f"{species}: {count}" for species, count in species_counter.items()])
-            writer.writerow([family_lin.display_lineage(), n_unique_species])
-            # writer.writerow([family_lin.display_lineage(), unique_species_count, species_counts_str])
-
-    with open(args.species_counts, 'w', newline='') as outfile:
-        writer = csv.writer(outfile)
-        writer.writerow(['species_lineage', 'count'])
-
-        for family_lin, species_counter in rankLineageDict.items():
-            for species_lin, count in species_counter.items():
-                writer.writerow([species_lin, count])
-
+        w = csv.writer(outfile)
+        w.writerow(['family_lineage', 'n_species_counts', 'n_virus_counts'])
+        for family_lineage, counts_dict in countsD.items():
+            n_at_rank = len(counts_dict[args.rank])
+            n_virus = len(counts_dict['name'])
+            w.write(f"{family_lineage},{n_at_rank},{n_virus}\n")
+            # currently not writing the actual COUNT of each unique one. not sure if we want/need that
 
 # Command line interface
 if __name__ == "__main__":
@@ -105,7 +92,6 @@ if __name__ == "__main__":
     parser.add_argument("--dna-cluster-lineages", help="CSV file with dna-based annotated clusters")
     parser.add_argument("--protein-cluster-lineages", help="CSV file with protein-based annotated clusters")
     parser.add_argument("-o", "--output-csv", help="Output CSV file to save the results")
-    parser.add_argument('-s', '--species-counts', help='output counts per species')
     parser.add_argument('-r', '--rank', default='species', help= 'rank to report counts')
     args = parser.parse_args()
     main(args)
