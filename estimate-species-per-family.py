@@ -1,11 +1,13 @@
 import csv
 import argparse
 from collections import defaultdict, Counter
-from sourmash.tax.tax_utils import BaseLineageInfo, RankLineageInfo, ICTV_RANKS, ICTVRankLineageInfo, get_ident
+from sourmash.tax.tax_utils import ICTVRankLineageInfo, get_ident
 
 
-# Function to count unique names in each family, and unique species and genera
-def parse_fastmultigather_lineage_file(csv_file_path):
+def parse_sourmash_tax_lineages(csv_file_path):
+    '''
+    parse annotations from tax genome results
+    '''
     annotationD = {} 
     with open(csv_file_path, newline='') as csvfile:
         reader = csv.DictReader(csvfile)
@@ -15,10 +17,6 @@ def parse_fastmultigather_lineage_file(csv_file_path):
             full_lineage = row['lineage'] + ';' + row['name']
             lineage_info = ICTVRankLineageInfo(lineage_str=full_lineage)
             annotationD[ident] = lineage_info
-            # species_lineage = row['lineage'] # check -- is this species or virus level??
-            # lineage_info = BaseLineageInfo(ICTV_RANKS, lineage_str=species_lineage)
-            # lineage_info = ICTVRankLineageInfo(lineage_str=species_lineage)
-            # species_name = lineage_info.name_at_rank('species')
     return annotationD
 
 def parse_annotated_clusters(csv_file_path):
@@ -52,12 +50,12 @@ def count_per_family(annotationD, count_rank = 'species'):
 # Main function to process the file and output results
 def main(args):
     # load all annotations
-    dna_fmg = parse_fastmultigather_lineage_file(args.dna_lineages)
-    prot_fmg = parse_fastmultigather_lineage_file(args.protein_lineages)
+    dna_fmg = parse_sourmash_tax_lineages(args.dna_lineages)
+    prot_fmg = parse_sourmash_tax_lineages(args.protein_lineages)
     dna_cluster = parse_annotated_clusters(args.dna_cluster_lineages)
     prot_cluster = parse_annotated_clusters(args.protein_cluster_lineages)
 
-    # for each ident, check annotations from each source, combine as needed (LCA, pull back to genus/family?? for protein)
+    # for each ident, get annotations from each source, combine as needed (LCA, pull back to genus/family? for protein)
     annotD = {} # combined annotation dict
     with open(args.all_idents_csv, newline='') as csvfile:
         reader = csv.DictReader(csvfile)
