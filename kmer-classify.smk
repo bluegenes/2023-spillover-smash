@@ -13,7 +13,7 @@ sp_fromfile = 'output.spillover/spillover.fromfile.csv'
 sp = pd.read_csv(sp_fromfile)
 
 SCALED = 1
-THRESHOLD_BP = 3* SCALED
+THRESHOLD_BP = 4* SCALED
 params = {"dna": {"ksize": [21,31], "scaled": SCALED, "threshold_bp": THRESHOLD_BP},
           "protein": {"ksize": [7, 10], "scaled": SCALED, "threshold_bp": THRESHOLD_BP}} #, 6,10
 
@@ -58,8 +58,8 @@ rule all:
         expand(f"{out_dir}/{basename}.{{search_params}}.pairwise.csv", search_params=all_params),
         expand(f"{out_dir}/{basename}.{{dna_params}}.cluster.ani-t{{threshold}}.with-lineages.csv", dna_params=dna_params, threshold=ANI_THRESHOLD),
         expand(f"{out_dir}/{basename}.{{dna_params}}.cluster.ani-t{{threshold}}.csv", dna_params=dna_params, threshold=ANI_THRESHOLD),
-        # expand(f"{out_dir}/{basename}.{{prot_params}}.cluster.ani-t{{threshold}}.csv", prot_params=prot_params, threshold=AAI_THRESHOLD),
-        # expand(f"{out_dir}/{basename}.{{prot_params}}.cluster.ani-t{{threshold}}.with-lineages.csv", prot_params=prot_params, threshold=AAI_THRESHOLD),
+        expand(f"{out_dir}/{basename}.{{prot_params}}.cluster.ani-t{{threshold}}.csv", prot_params=prot_params, threshold=AAI_THRESHOLD),
+        expand(f"{out_dir}/{basename}.{{prot_params}}.cluster.ani-t{{threshold}}.with-lineages.csv", prot_params=prot_params, threshold=AAI_THRESHOLD),
 
 
 rule index_database:
@@ -133,7 +133,7 @@ rule tax_annotate:
         """
         sourmash tax annotate -g {input.gather_csv} \
                               -t {input.lineages} \
-                              --ictv -o {params.output_dir} 2> {log}
+                              --ictv -o {params.output_dir} --force 2> {log}
         """
 
 rule tax_genome:
@@ -147,7 +147,7 @@ rule tax_genome:
         partition = "low2",
         time=240,
     conda: "conf/env/sourmash-ictv.yml"
-    log: f"{logs_dir}/tax/{{basename}}-x-{{db_basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.t{{threshold}}.ictv.log"
+    log: f"{logs_dir}/tax-genome/{{basename}}-x-{{db_basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.t{{threshold}}.ictv.log"
     benchmark: f"{logs_dir}/tax-genome/{{basename}}-x-{{db_basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.t{{threshold}}.ictv.benchmark"
     params:
         output_dir = f"{out_dir}/fastmultigather/{{basename}}-x-{{db_basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.t{{threshold}}"
@@ -168,6 +168,8 @@ rule spillover_pairwise:
         mem_mb=lambda wildcards, attempt: attempt *20000,
         partition="low2",
         time=240,
+    params:
+        moltype = lambda w: w.moltype.upper() if w.moltype == "dna" else w.moltype,
     conda: "conf/env/branchwater.yml"
     log: f"{logs_dir}/pairwise/{{basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.pairwise.log"
     benchmark: f"{logs_dir}/pairwise/{{basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.pairwise.benchmark"
@@ -176,6 +178,7 @@ rule spillover_pairwise:
         sourmash scripts pairwise {input.spillover_zip} --ani \
                                   -k {wildcards.ksize} \
                                   --scaled {wildcards.scaled} \
+                                  --moltype {params.moltype} \
                                   --write-all -o {output} 2> {log}
         """
 
