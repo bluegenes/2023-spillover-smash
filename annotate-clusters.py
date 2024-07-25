@@ -63,9 +63,10 @@ def main(args):
                 cluster_annot = set()
                 nodes = row['nodes'] # should be the list of queries in this cluster
                 for node in nodes.split(';'):
+                    node_ident = sourmash.tax.tax_utils.get_ident(node)
                     # find lineage and write annotated row
                     lineage=None
-                    lin = tax_assign.get(node)
+                    lin = tax_assign.get(node_ident)
                     if lin:
                         if args.lins:
                             lineage = tax_utils.LINLineageInfo(lineage_str=lin)
