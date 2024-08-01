@@ -6,7 +6,8 @@ import sourmash
 from sourmash.tax import tax_utils
 from sourmash.logging import notify, error
 
-
+# Increase the field size limit to read large CSV files
+csv.field_size_limit(sys.maxsize)
 
 def main(args):
     """
