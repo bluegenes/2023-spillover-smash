@@ -18,8 +18,8 @@ params = {"dna": {"ksize": [21,31], "scaled": SCALED, "threshold_bp": THRESHOLD_
           "protein": {"ksize": [7, 10], "scaled": SCALED, "threshold_bp": THRESHOLD_BP}} #, 6,10
 
 TAX_FILE = 'output.vmr/vmr_MSL38_v1.taxonomy.csv'
-ANI_THRESHOLD = [0.95, 0.9]
-AAI_THRESHOLD = [0.8, 0.6]
+ANI_THRESHOLD = [0.95, 0.9, 0.8, 0.7]
+AAI_THRESHOLD = [0.9, 0.8, 0.6, 0.5]
 
 
 onstart:
@@ -53,8 +53,8 @@ rule all:
         expand(f"{out_dir}/fastmultigather/{basename}-x-{db_basename}.{{search_params}}.t{{thresh}}.fmgather.csv", search_params = prot_params, thresh = params['protein']['threshold_bp']),
         expand(f"{out_dir}/fastmultigather/{basename}-x-{db_basename}.{{search_params}}.t{{thresh}}.fmgather.with-lineages.csv", search_params = dna_params, thresh = params['dna']['threshold_bp']),
         expand(f"{out_dir}/fastmultigather/{basename}-x-{db_basename}.{{search_params}}.t{{thresh}}.fmgather.with-lineages.csv", search_params = prot_params, thresh = params['protein']['threshold_bp']),
-        expand(f"{out_dir}/fastmultigather/{basename}-x-{db_basename}.{{search_params}}.t{{thresh}}.classifications.csv", search_params=dna_params, thresh = params['dna']['threshold_bp']),
-        expand(f"{out_dir}/fastmultigather/{basename}-x-{db_basename}.{{search_params}}.t{{thresh}}.classifications.csv", search_params=prot_params, thresh = params['protein']['threshold_bp']),
+        expand(f"{out_dir}/fastmultigather/{basename}-x-{db_basename}.{{search_params}}.t{{thresh}}.classifications{{anithresh}}.csv", search_params=dna_params, thresh = params['dna']['threshold_bp'], anithresh=[0.9,0.8,0.7]),
+        expand(f"{out_dir}/fastmultigather/{basename}-x-{db_basename}.{{search_params}}.t{{thresh}}.classifications{{anithresh}}.csv", search_params=prot_params, thresh = params['protein']['threshold_bp'], anithresh=[0.9, 0.8,0.6,0.5,0.4]),
         expand(f"{out_dir}/{basename}.{{search_params}}.pairwise.csv", search_params=all_params),
         expand(f"{out_dir}/{basename}.{{dna_params}}.cluster.ani-t{{threshold}}.with-lineages.csv", dna_params=dna_params, threshold=ANI_THRESHOLD),
         expand(f"{out_dir}/{basename}.{{dna_params}}.cluster.ani-t{{threshold}}.csv", dna_params=dna_params, threshold=ANI_THRESHOLD),
@@ -141,22 +141,24 @@ rule tax_genome:
         gather_csv = f"{out_dir}/fastmultigather/{{basename}}-x-{{db_basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.t{{threshold}}.fmgather.csv",
         lineages = TAX_FILE,
     output:
-        f"{out_dir}/fastmultigather/{{basename}}-x-{{db_basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.t{{threshold}}.classifications.csv",
+        f"{out_dir}/fastmultigather/{{basename}}-x-{{db_basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.t{{threshold}}.classifications{{anithresh}}.csv",
     resources:
         mem_mb=lambda wildcards, attempt: attempt *3000,
         partition = "low2",
         time=240,
-    conda: "conf/env/sourmash-ictv.yml"
-    log: f"{logs_dir}/tax-genome/{{basename}}-x-{{db_basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.t{{threshold}}.ictv.log"
-    benchmark: f"{logs_dir}/tax-genome/{{basename}}-x-{{db_basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.t{{threshold}}.ictv.benchmark"
+    conda: "conf/env/branchwater.yml"
+    log: f"{logs_dir}/tax-genome/{{basename}}-x-{{db_basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.t{{threshold}}.classifications{{anithresh}}.ictv.log"
+    benchmark: f"{logs_dir}/tax-genome/{{basename}}-x-{{db_basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.t{{threshold}}.classifications{{anithresh}}.ictv.benchmark"
     params:
-        output_dir = f"{out_dir}/fastmultigather/{{basename}}-x-{{db_basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.t{{threshold}}"
+        output_dir = f"{out_dir}/fastmultigather/{{basename}}-x-{{db_basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.t{{threshold}}_{{anithresh}}",
+        tmp_out = f"{out_dir}/fastmultigather/{{basename}}-x-{{db_basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.t{{threshold}}_{{anithresh}}.classifications.csv",
     shell:
         """
         sourmash tax genome -g {input.gather_csv} \
                             -t {input.lineages} \
                             --ictv -o {params.output_dir} \
-                            --ani-threshold 0.2 --force  2> {log}
+                            --ani-threshold {wildcards.anithresh} --force  2> {log}
+        mv {params.tmp_out} {output}
         """
 
 rule spillover_pairwise:
@@ -213,7 +215,7 @@ rule annotate_clusters:
         mem_mb=lambda wildcards, attempt: attempt *3000,
         partition = "low2",
         time=240,
-    conda: "conf/env/sourmash-ictv.yml"
+    conda: "conf/env/branchwater.yml"
     log: f"{logs_dir}/cluster/{{basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.cluster.ani-t{{ani_threshold}}.annotate.log"
     benchmark: f"{logs_dir}/cluster/{{basename}}.{{moltype}}.k{{ksize}}-sc{{scaled}}.cluster.ani-t{{ani_threshold}}.annotate.benchmark"
     params:

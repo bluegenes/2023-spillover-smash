@@ -29,6 +29,7 @@ def build_geneD(fromfile_csv_list, suppressed_records=[]):
                 geneD[genome_acc] = {"dna": gene_accs, "protein": prot_accs}
     return geneD
 
+
 def main(args):
 
     # read in VMR tsv containing virus metadata for exemplar and additional isolate genomes
@@ -39,7 +40,7 @@ def main(args):
 
     # handle GenBank Failures and suppressed records
     vmr.loc[vmr['GenBank Assembly ID'].isin(args.suppressed_records), 'GenBank Failures'] = 'suppressed'
-    vmr['VMR_Accession'] = 'VMR_MSL38_' + vmr['Sort'].astype(str)
+    vmr['VMR_Accession'] = args.basename + vmr['Sort'].astype(str)
     curate_info = ['suppressed', 'no_assembly', 'multiple_acc']#, 'parentheses']#, 'retrieval']
 
     vmr = vmr.rename(columns={assembly_ident_col: 'ident', genbank_ident_col: 'genbank_ident', refseq_ident_col: 'refseq_ident', 'Virus name(s)': 'name', 'Exemplar or additional isolate': 'exemplar_or_additional'})
@@ -71,6 +72,7 @@ def cmdline(sys_args):
     p = argparse.ArgumentParser()
     p.add_argument('-i', '--fromfile', nargs='+', help='sourmash fromfile csv(s) with name,genome_filename,protein_filename columns', default=["output.vmr/vmr_MSL38_v1.fromfile.csv"])
     p.add_argument('-v', '--vmr-tsv', help='VMR tsv with genbank assembly accessions', default="inputs/VMR_MSL38_v1.acc.tsv")
+    p.add_argument('--basename', help="Basename for VMR accession", default="VMR_MSL38_v1_")
     p.add_argument('-o', '--output', help='Output taxonomy CSV file', default="output.vmr/vmr_MSL38_v1.taxonomy.csv")
     p.add_argument('-s', '--suppressed-records', nargs='+', help='Suppressed records', default=['GCF_002987915.1', 'GCF_002830945.1', 'GCF_002828705.1', 'GCA_004789135.1'])
     args = p.parse_args()

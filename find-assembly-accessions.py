@@ -144,6 +144,10 @@ def main(args):
             sys.exit(0)
         input_vmr = vmr_tsv
 
+    if args.output_directsketch:
+        ds = open(args.output_directsketch, 'w')
+        ds.write("accession,name,ftp_path\n")
+    
     # read in the file with tsv, loop through to link to assembly dataset information
     with open(input_vmr, 'r') as inF, open(args.output_vmr, 'w', newline='') as out_acc:
         reader = csv.DictReader(inF, delimiter='\t')
@@ -154,6 +158,9 @@ def main(args):
             if n % 500 == 0:
                 print(f"Processed {n} accessions...")
             row = find_assembly_accessions(row)
+            if row['GenBank Assembly ID'] and args.output_directsketch:
+                name = row['GenBank Assembly ID'] + ' ' +  row['Virus name(s)'] + ' ' + row['Virus isolate designation'] 
+                ds.write(f"{row['GenBank Assembly ID']},{name},\n")
             writer.writerow(row)
 
 def cmdline(sys_args):
@@ -163,6 +170,7 @@ def cmdline(sys_args):
     p.add_argument("-o", "--output-vmr", default='inputs/VMR_MSL38_v1.acc.tsv')
     p.add_argument("-s", "--sheet-name", default='VMR MSL38 v1')
     p.add_argument("-c", "--only-convert", action='store_true', default=False, help="Only convert excel to tsv, then exit.")
+    p.add_argument("--output-directsketch", help="optionally, output file for sourmash_plugin_directsketch use")
     args = p.parse_args()
     return main(args)
 

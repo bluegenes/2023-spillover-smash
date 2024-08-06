@@ -5,8 +5,8 @@ channels:
   - defaults
 dependencies:
   - python=3.10
-  - sourmash>=4.8.4,<5
-  - sourmash_plugin_branchwater>=0.9.3,<1
+  - sourmash>=4.8.9,<5
+  - sourmash_plugin_branchwater>=0.9.5,<1
   - rust
   - gcc_linux-64
   - gxx_linux-64
