@@ -123,7 +123,7 @@ rule acc_to_directsketch:
         partition="low2",
     run:
        # open the assembly summary files and get the "good" (current) and "bad" (historical, suppressed) accessions
-        acc2size = {}
+        acc2info = {}
         with open(input.good_acc, 'rt') as gacc:
             # good_accs = set()
             r = csv.reader(gacc, delimiter='\t')
@@ -132,16 +132,21 @@ rule acc_to_directsketch:
                     continue
                 # good_accs.add(row[0])
                 acc = row[0]
-                gca_acc = row[0].replace("GCA", "GCF")
-                acc2size[acc] = row[25] # get genome length! (so we don't need to dl fasta to count :)
-                acc2size[gca_acc] = row[25]
+                gcf_acc = row[0].replace("GCA", "GCF")
+                len = row[25] # get genome length! (so we don't need to dl fasta to count :) 
+                ftp_path = row[19]
+                acc2info[acc] =  (len,ftp_path)
+                acc2info[gcf_acc] = (len,ftp_path)
         with open(input.bad_acc, 'rt') as bacc:
             bad_accs = set()
             r = csv.reader(bacc, delimiter='\t')
             for row in r:
                 if row[0].startswith('#'):
                     continue
-                bad_accs.add(row[0])
+                acc = row[0]
+                gcf_acc = row[0].replace("GCA", "GCF")
+                bad_accs.add(acc)
+                bad_accs.add(gcf_acc)
         # open the vmr file and write directsketch (gbsketch) file for "good" (current) accessions
         curate_ds = open(output.curated_ds, 'w')
         curate_ds.write("accession,name,moltype,md5sum,download_filename,url\n")
@@ -158,19 +163,18 @@ rule acc_to_directsketch:
             for row in r:
                 fail_reason = None
                 acc = row['GenBank Assembly ID']
-                if acc and acc not in bad_accs:# and acc in acc2size.keys(): 
+                if acc and acc not in bad_accs:# and acc in acc2info.keys(): 
                     name = row['GenBank Assembly ID'] + ' ' +  row['Virus name(s)'] + ' ' + row['Virus isolate designation']
                     name = name.strip()
-                    ftp_path = ""
+                    if ',' in name:
+                        name = name.replace(',', ';')
+                    len, ftp_path = acc2info.get(acc, ("", ""))
                     outF.write(f"{acc},{name},{ftp_path}\n")
-                    import pdb;pdb.set_trace()
-                    len = acc2size.get(acc, "")
                     lengths.write(f"{acc},{len}\n")
                 else:
                     # this should include ALL failures, including failure to find assembly, suppressed records, etc
                     # write file with "bad" historial accessions so we can curate from their non-assembly dataset records
                     # may not always be desirable, b/c they were likely suppressed for a reason.
-                    # import pdb;pdb.set_trace()
                     virus_name = row['Virus name(s)'] + ' ' + row['Virus isolate designation'] #+ '; genbank accs: ' + row["Virus GENBANK accession"]
                     gb_acc = row["Virus GENBANK accession"]
                     if acc:
