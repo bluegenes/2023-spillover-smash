@@ -85,7 +85,8 @@ wildcard_constraints:
 
 rule all:
     input:
-        os.path.join(out_dir, f"{basename}.directsketch.zip"), 
+        os.path.join(out_dir, f"{basename}.directsketch.zip"),
+        os.path.join(out_dir, f"{basename}.nuccore-directsketch.zip"),
         # expand(os.path.join(out_dir, f"{basename}.{{moltype}}.zip"), moltype = ['dna', 'protein']),
         # os.path.join(out_dir, f'{basename}.taxonomy.csv'),
         # os.path.join(out_dir, f'{basename}.protein-taxonomy.csv'),
@@ -176,6 +177,9 @@ rule acc_to_directsketch:
                     # write file with "bad" historial accessions so we can curate from their non-assembly dataset records
                     # may not always be desirable, b/c they were likely suppressed for a reason.
                     virus_name = row['Virus name(s)'] + ' ' + row['Virus isolate designation'] #+ '; genbank accs: ' + row["Virus GENBANK accession"]
+                    virus_name = virus_name.strip()
+                    if ',' in virus_name:
+                        virus_name = virus_name.replace(',', ';')
                     gb_acc = row["Virus GENBANK accession"]
                     if acc:
                         print(f"Skipping {acc} for {virus_name} because it is in the historical assembly summary (suppressed)")
@@ -194,7 +198,7 @@ rule acc_to_directsketch:
                             md5sum = ""
                             dl_filename = f"genbank/nuccore/{gba}.fna.gz"
                             dl_link = f"https://www.ncbi.nlm.nih.gov/nuccore/{gba}?report=fasta"
-                            curate_ds.write(f"{gba},{this_name},{moltype},{md5sum},{dl_filename},{dl_link},\n")
+                            curate_ds.write(f"{gba},{this_name},{moltype},{md5sum},{dl_filename},{dl_link}\n")
                     
                             # create new name for record so we can combine segments if needed
                             vmr_acc = basename + '_'+ str(row['Sort'])
@@ -237,35 +241,45 @@ rule directsketch_assembly_datasets:
 ### still need to get FASTA length info -- can I get it from ncbi somehow?
 ### for curated accessions, we need to download the fasta files from GenBank + find the protein accessions + their FASTA
 
-
-
-
 # download nuccore fasta for curated fasta
-# rule directsketch_curated:
+rule directsketch_curated:
+    input:
+        csvfile = os.path.join(out_dir, f"{basename}.curate-directsketch.csv"),
+    output:
+        zipf = os.path.join(out_dir, f"{basename}.nuccore-directsketch.zip"),
+        failed = os.path.join(out_dir, f"{basename}.nuccore-directsketch-failed.csv"),
+    threads: 1
+    resources:
+        mem_mb=3000,
+        disk_mb=5000,
+        runtime=60,
+        time=90,
+        partition="low2",
+    conda: "conf/env/directsketch.yml"
+    params:
+        fastadir= "genbank/nuccore",
+    log: os.path.join(logs_dir, "directsketch", f"{basename}.curate.log")
+    benchmark: os.path.join(logs_dir, "directsketch", f"{basename}.curate.benchmark")
+    shell:
+        """
+        sourmash scripts urlsketch -o {output.zipf} {input.csvfile} \
+                                  -p dna,k=21,k=31,scaled=1,abund \
+                                  -k --fasta {params.fastadir} \
+                                  --failed {output.failed} 2> {log}
+        """
+
+# rule sigcat_curated:
 #     input:
-#         csvfile = os.path.join(out_dir, f"{basename}.curate-directsketch.csv"),
+#         sigs = os.path.join(out_dir, f"{basename}.nuccore-directsketch.zip"),
 #     output:
-#         zipf = os.path.join(out_dir, f"{basename}.nuccore.zip"),
-#         failed = os.path.join(out_dir, f"{basename}.dna-curate-directsketch-failed.csv"),
-#     threads: 1
-#     resources:
-#         mem_mb=3000,
-#         disk_mb=5000,
-#         runtime=60,
-#         time=90,
-#         partition="low2",
-#     conda: "conf/env/directsketch.yml"
-#     params:
-#         fastadir= "genbank/nuccore",
-#     log: os.path.join(logs_dir, "directsketch", "{basename}.curate.log")
-#     benchmark: os.path.join(logs_dir, "directsketch", "{basename}.curate.benchmark")
+#         sig = os.path.join(out_dir, f"{basename}.nuccore-directsketch.sig"),
+#     conda: "conf/env/sourmash.yml"
 #     shell:
 #         """
-#         sourmash scripts urlsketch -o {output.zipf} {input.csvfile} \
-#                                   -p dna,k=21,k=31,scaled=1,abund \
-#                                   -k --fasta {params.fastadir} \
-#                                   --failed {output.failed} 2> {log}
+#         sourmash sig cat {input.sigs} -o {output}
 #         """
+
+
 # # Where we don't have assembly datasets, curate fasta files from GenBank
 # rule download_genbank_accession:
 #     output: 
