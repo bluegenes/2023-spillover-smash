@@ -30,7 +30,7 @@ def download_and_join_fastas(accession_list, nucleotide_file, protein_file):
     for acc in accession_list:
         acname = ""
         if ':' in acc: # e.g. RNA1:KT601119
-            acname, acc = acc.split(':')[1].strip()
+            acname, acc = acc.split(':')
             acname = acname + ':'
         try:
             handle = Entrez.efetch(db="nucleotide", id=acc, rettype="gb", retmode="text")
