@@ -122,7 +122,7 @@ def cmdline(sys_args):
     p = argparse.ArgumentParser(description="Download sequences for a list of GenBank accessions from a CSV file")
     p.add_argument("csvfile", type=str, help="The CSV file containing accession numbers and download filenames")
     p.add_argument("--fileinfo", type=str, help="The filename for the fileinfo CSV that contains details for all accessions")
-    p.add_argument('--output-fastadir', type=str, help="The directory to save the output FASTA files", default=".")
+    p.add_argument('-o','--output-fastadir', type=str, help="The directory to save the output FASTA files", default=".")
     p.add_argument("--failed", type=str, help="The filename for the failed accessions CSV file")
 
     # Parse command line arguments
