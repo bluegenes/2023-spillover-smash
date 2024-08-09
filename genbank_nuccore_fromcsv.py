@@ -32,6 +32,7 @@ def download_and_join_fastas(accession_list, nucleotide_file, protein_file):
         if ':' in acc: # e.g. RNA1:KT601119
             acname, acc = acc.split(':')
             acname = acname + ':'
+            acc = acc.strip()
         try:
             handle = Entrez.efetch(db="nucleotide", id=acc, rettype="gb", retmode="text")
             record = SeqIO.read(handle, "genbank")
@@ -59,26 +60,30 @@ def download_and_join_fastas(accession_list, nucleotide_file, protein_file):
             sys.stderr.write(f"Failed to download FASTA for {acc}: {str(e)}\n")
             failed_accinfo.append((acname + acc, "DNA"))
             failed_accinfo.append((acname + acc, "protein"))
-            
+
+    nucl_len = 0
+    prot_len = 0
     # Save the sequences to gzip-compressed FASTA files
     if nucl_seqs:
         with gzip.open(nucleotide_file, "wt") as f:
             for ac, seq in enumerate(nucl_seqs):
+                nucl_len+=len(seq)
                 f.write(f">{ac}\n{seq}\n")
     if prot_seqs:
         with gzip.open(protein_file, "wt") as f:
             for ac, seqs in prot_seqs:
                 for i, (protein_sequence, protein_id) in enumerate(seqs):
+                    prot_len+=len(protein_sequence)
                     f.write(f">{ac}_CDS{i+1}|{protein_id}\n{protein_sequence}\n")
     else:
         protein_file = None
 
-    return failed_accinfo, nucleotide_file, protein_file if prot_seqs else None
+    return failed_accinfo, nucleotide_file, protein_file if prot_seqs else None, nucl_len, prot_len
 
 def main(args):
     """
     Processes the CSV file and downloads nucleotide sequences for the given GenBank accession numbers.
-    Also writes a single fileinfo CSV file with details for all accessions.
+    Also writes a single fromfile CSV file with details for all accessions.
     
     Args:
         args (Namespace): The command-line arguments.
@@ -87,10 +92,12 @@ def main(args):
         None
     """
     all_fileinfo = []
+    nucl_lengths = []
+    prot_lengths = []
     failed_accs = []
     outdir = args.output_fastadir
 
-    with open(args.csvfile, newline='') as csvfile:
+    with open(args.csvfile) as csvfile:
         reader = csv.DictReader(csvfile)
         for row in reader:
             name = row['name']
@@ -98,32 +105,48 @@ def main(args):
             accessions = row['genbank_accessions'].split(';')
             nucleotide_file = f"{outdir}/{ident}.fna.gz"
             protein_file = f"{outdir}/{ident}.faa.gz"
-            failed_accinfo, nucl_file, prot_file = download_and_join_fastas(accessions, nucleotide_file, protein_file)
+            failed_accinfo, nucl_file, prot_file, nucl_len, prot_len = download_and_join_fastas(accessions, nucleotide_file, protein_file)
             failed_accs.append((name, *failed_accinfo))
             all_fileinfo.append((name, nucl_file, prot_file))
-    
+            nucl_lengths.append((name, nucl_len))
+            prot_lengths.append((name, prot_len))
+
+
     # Write fileinfo to a CSV file
-    with open(args.fileinfo, "w", newline='') as csvfile:
+    with open(args.fromfile, "w") as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(["ident", "name", "genome_file", "protein_file"])
         for info in all_fileinfo:
             writer.writerow(info)
-    
+
     # write failed accessions to a CSV file
-    with open(args.failed, "w", newline='') as csvfile:
+    with open(args.failed, "w") as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(["name", "accession", "sequence_type"])
         for info in failed_accs:
             writer.writerow(info)
+
+    # write lengths files
+    with open(args.nucl_lengths, "w") as nl:
+        nl.write("name,length\n")
+        for name, len in nucl_lengths:
+            nl.write(f"{name},{len}\n")
+
+    with open(args.prot_lengths, "w") as pl:
+        pl.write("name,length\n")
+        for name, len in prot_lengths:
+            pl.write(f"{name},{len}\n")
 
 
 def cmdline(sys_args):
     "Command line entry point w/argparse action."
     p = argparse.ArgumentParser(description="Download sequences for a list of GenBank accessions from a CSV file")
     p.add_argument("csvfile", type=str, help="The CSV file containing accession numbers and download filenames")
-    p.add_argument("--fileinfo", type=str, help="The filename for the fileinfo CSV that contains details for all accessions")
+    p.add_argument("--fromfile", type=str, help="The filename for the output 'fromfile' CSV that can be used with sourmash sketch fromfile")
     p.add_argument('-o','--output-fastadir', type=str, help="The directory to save the output FASTA files", default=".")
     p.add_argument("--failed", type=str, help="The filename for the failed accessions CSV file")
+    p.add_argument("--nucl-lengths", type=str, help="filename for output lengths CSV for nucleotides")
+    p.add_argument("--prot-lengths", type=str, help="filename for output lengths CSV for proteins")
 
     # Parse command line arguments
     args = p.parse_args()

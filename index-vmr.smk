@@ -86,7 +86,7 @@ wildcard_constraints:
 rule all:
     input:
         os.path.join(out_dir, f"{basename}.directsketch.zip"),
-        os.path.join(out_dir, f"{basename}.nuccore-directsketch.zip"),
+        os.path.join(out_dir, f"curated/{basename}.curate.fromfile.csv"),
         # expand(os.path.join(out_dir, f"{basename}.{{moltype}}.zip"), moltype = ['dna', 'protein']),
         # os.path.join(out_dir, f'{basename}.taxonomy.csv'),
         # os.path.join(out_dir, f'{basename}.protein-taxonomy.csv'),
@@ -201,12 +201,12 @@ rule acc_to_directsketch:
                             dl_link = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&id={gba}&rettype=fasta&retmode=text"
                             curate_ds.write(f"{gba},{this_name},{moltype},{md5sum},{dl_filename},{dl_link}\n")
                     
-                            # create new name for record so we can combine segments if needed
-                            vmr_acc = basename + '_'+ str(row['Sort'])
-                            curated_name = vmr_acc + ' ' + virus_name
-                            curated_name = curated_name.strip()
-                            fail_reason = row['GenBank Failures']
-                            curate_info.write(f"{curated_name},{fail_reason},{row['Virus GENBANK accession']}\n")
+                    # create new name for record so we can combine segments if needed
+                    vmr_acc = basename + '_'+ str(row['Sort'])
+                    curated_name = vmr_acc + ' ' + virus_name
+                    curated_name = curated_name.strip()
+                    fail_reason = row['GenBank Failures']
+                    curate_info.write(f"{curated_name},{fail_reason},{row['Virus GENBANK accession']}\n")
 
                         # parentheses_acc = curate_vmr[curate_vmr['GenBank Failures'] == 'parentheses']['VMR_Accession'].tolist()
                         # curate_vmr.loc[:, 'genbank_accessions'] = curate_vmr.apply(clean_genbank_accs, axis=1)
@@ -247,9 +247,10 @@ rule download_join_nuccore_fasta:
     input:
         curate_info = os.path.join(out_dir, f"{basename}.ncfasta-to-curate.csv"),
     output:
-        fromfile = os.path.join(out_dir, f"curated/{basename}.curate.fileinfo.csv")
+        fromfile = os.path.join(out_dir, f"curated/{basename}.curate.fromfile.csv"),
         failed = os.path.join(out_dir, f"curated/{basename}.curate.failed.csv"),
-        lengths = os.path.join(out_dir, f"curated/{basename}.curate.lengths.csv"),
+        nucl_lengths = os.path.join(out_dir, f"curated/{basename}.curate.nucl-lengths.csv"),
+        prot_lengths = os.path.join(out_dir, f"curated/{basename}.curate.protein-lengths.csv"),
     threads: 1
     resources:
         mem_mb=3000,
@@ -264,9 +265,11 @@ rule download_join_nuccore_fasta:
     benchmark: os.path.join(logs_dir, "nuccore-curate", f"{basename}.curate.benchmark")
     shell:
         """
+        mkdir -p {params.fastadir}
         python genbank_nuccore_fromcsv.py {input.curate_info} \
-        --fileinfo {output.fileinfo} --failed {output.failed} \
-        -o {params.fastadir} --lengths {output.lengths} 2> {log}
+        --fromfile {output.fromfile} --failed {output.failed} \
+        -o {params.fastadir} --nucl-lengths {output.nucl_lengths} \
+        --prot-lengths {output.prot_lengths} 2> {log}
         """
 
 # rule download_genbank_accession:
