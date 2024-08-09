@@ -196,8 +196,9 @@ rule acc_to_directsketch:
                             this_name = gba + ' ' + virus_name
                             moltype = "DNA"
                             md5sum = ""
-                            dl_filename = f"genbank/nuccore/{gba}.fna.gz"
-                            dl_link = f"https://www.ncbi.nlm.nih.gov/nuccore/{gba}?report=fasta"
+                            dl_filename = f"genbank/nuccore/{gba}.fna"
+                            # dl_link = f"https://www.ncbi.nlm.nih.gov/sviewer/viewer.cgi?db=nuccore&id={gba}&report=fasta&retmode=text"
+                            dl_link = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&id={gba}&rettype=fasta&retmode=text"
                             curate_ds.write(f"{gba},{this_name},{moltype},{md5sum},{dl_filename},{dl_link}\n")
                     
                             # create new name for record so we can combine segments if needed
@@ -264,8 +265,8 @@ rule directsketch_curated:
         """
         sourmash scripts urlsketch -o {output.zipf} {input.csvfile} \
                                   -p dna,k=21,k=31,scaled=1,abund \
-                                  -k --fasta {params.fastadir} \
-                                  --failed {output.failed} 2> {log}
+                                  -k --fastas {params.fastadir} \
+                                  --failed {output.failed} -c {threads} -r 3 2> {log}
         """
 
 # rule sigcat_curated:

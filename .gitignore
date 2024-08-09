@@ -11,3 +11,5 @@ logs/*
 *tsv
 */
 *xls*
+*fna.gz
+slurm*
