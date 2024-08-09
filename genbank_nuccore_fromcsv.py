@@ -29,10 +29,10 @@ def download_and_join_fastas(accession_list, nucleotide_file, protein_file):
     failed_accinfo = []
     for acc in accession_list:
         acname = ""
-        if ':' in acc: # e.g. RNA1:KT601119
+        if ':' in acc: # e.g. RNA1:KT601119, 'S: MG888402', 'DNA-B: DQ356429', 'Seg2: OP436270'
             acname, acc = acc.split(':')
             acname = acname + ':'
-            acc = acc.strip()
+        acc = acc.strip()
         try:
             handle = Entrez.efetch(db="nucleotide", id=acc, rettype="gb", retmode="text")
             record = SeqIO.read(handle, "genbank")
@@ -99,10 +99,28 @@ def main(args):
 
     with open(args.csvfile) as csvfile:
         reader = csv.DictReader(csvfile)
-        for row in reader:
+        for n, row in enumerate(reader):
+            if n!=0 and n % 100 == 0:
+                print(f"processed {n} records")
+            # if there is no genbank accession to work with, ignore
+            fail_reason = row["assembly_failure"]
+            if "no_accession" in fail_reason:
+                continue
             name = row['name']
             ident = name.split(' ')[0]
             accessions = row['genbank_accessions'].split(';')
+            # a couple weirdly formatted rows to handle:
+            #RNA1:OL471978 - RNA2: OL471979 - RNA3:OL471980 - RNA4: OL471981 - RNA5:OL471982 - RNA7: OP441764
+            if len(accessions) == 1 and ' - ' in accessions[0]: # didn't get split and contains ' - '
+                accessions = accessions[0].split(' - ')
+            # need to split this entry: "L: ON381478-ON381479" but not these: "DNA-A: KC706615", "DNA-B: MH469732" etc
+            elif len(accessions) == 1 and '-' in accessions[0]:
+                if ':' in accessions[0]:
+                    parts = accessions[0].split(':')
+                    if '-' in parts[1]:
+                        split = parts[1].split('-')
+                        accessions = parts[0] + split
+
             nucleotide_file = f"{outdir}/{ident}.fna.gz"
             protein_file = f"{outdir}/{ident}.faa.gz"
             failed_accinfo, nucl_file, prot_file, nucl_len, prot_len = download_and_join_fastas(accessions, nucleotide_file, protein_file)
@@ -129,12 +147,12 @@ def main(args):
     # write lengths files
     with open(args.nucl_lengths, "w") as nl:
         nl.write("name,length\n")
-        for name, len in nucl_lengths:
+        for name, length in nucl_lengths:
             nl.write(f"{name},{len}\n")
 
     with open(args.prot_lengths, "w") as pl:
         pl.write("name,length\n")
-        for name, len in prot_lengths:
+        for name, length in prot_lengths:
             pl.write(f"{name},{len}\n")
 
 
