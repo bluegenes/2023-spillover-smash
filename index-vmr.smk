@@ -87,6 +87,8 @@ rule all:
     input:
         os.path.join(out_dir, f"{basename}.directsketch.zip"),
         os.path.join(out_dir, f"curated/{basename}.curate.fromfile.csv"),
+        os.path.join(out_dir, f"curated/{basename}.curate.zip"),
+        os.path.join(out_dir, f"{basename}.combined.zip"),
         # expand(os.path.join(out_dir, f"{basename}.{{moltype}}.zip"), moltype = ['dna', 'protein']),
         # os.path.join(out_dir, f'{basename}.taxonomy.csv'),
         # os.path.join(out_dir, f'{basename}.protein-taxonomy.csv'),
@@ -272,54 +274,73 @@ rule download_join_nuccore_fasta:
         --prot-lengths {output.prot_lengths} 2> {log}
         """
 
-# rule download_genbank_accession:
-#     output: 
-#         nucl=protected(os.path.join(out_dir, "genbank/nuccore/nucleotide/{acc}.fna.gz")),
-#         fileinfo=protected(os.path.join(out_dir, "genbank/curated/fileinfo/{acc}.fileinfo.csv")),
-#     params:
-#         prot_dir= os.path.join(out_dir, "genbank/curated/protein"),
-#         prot=protected(os.path.join(out_dir, "genbank/curated/protein/{acc}.faa.gz")),
-#     conda: "conf/env/biopython.yml"
-#     log: os.path.join(logs_dir, "downloads", "{acc}.log")
-#     benchmark: os.path.join(logs_dir, "downloads", "{acc}.benchmark")
-#     threads: 1
-#     resources:
-#         mem_mb=3000,
-#         runtime=60,
-#         time=90,
-#         partition="low2",
-#     shell:
-#         """
-#         mkdir -p {params.prot_dir}
-#         python genbank_nuccore.py {wildcards.acc} --nucleotide {output.nucl} --protein {params.prot} --fileinfo {output.fileinfo} 2> {log}
-#         """
+rule sketch_curated:
+    input:
+        fromfile = os.path.join(out_dir, f"curated/{basename}.curate.fromfile.csv"),
+    output:
+        zipf = os.path.join(out_dir, f"curated/{basename}.curate.zip"),
+    threads: 1
+    resources:
+        mem_mb=3000,
+        disk_mb=5000,
+        runtime=60,
+        time=90,
+        partition="low2",
+    conda: "conf/env/branchwater.yml"
+    log: os.path.join(logs_dir, "curated-sketch", f"{basename}.log")
+    benchmark: os.path.join(logs_dir, "curated-sketch", f"{basename}.benchmark")
+    shell:
+        """
+        sourmash scripts manysketch {input.fromfile} -p dna,k=21,k=31,scaled=1,abund \
+                                    -o {output.zipf} 2> {log}
+        """
 
-# cat the individual fasta files (genbank accessions) into a single fasta file per vmr accession
-# rule cat_components_to_vmr_assembly:
-#     input: 
-#         fileinfo=lambda w: expand(os.path.join(out_dir, "genbank/curated/fileinfo/{acc}.fileinfo.csv"), acc=vmr_to_genbank[w.vmr_acc])
+rule combine_sigs:
+    input:
+        directsketch = os.path.join(out_dir, f"{basename}.directsketch.zip"),
+        curated = os.path.join(out_dir, f"curated/{basename}.curate.zip"),
+    output:
+        combined = os.path.join(out_dir, f"{basename}.combined.zip"),
+    threads: 1
+    resources:
+        mem_mb=3000,
+        disk_mb=5000,
+        runtime=60,
+        time=90,
+        partition="low2",
+    conda: "conf/env/branchwater.yml"
+    log: os.path.join(logs_dir, "combine-sketches", f"{basename}.log")
+    benchmark: os.path.join(logs_dir, "combine-sketches", f"{basename}.benchmark")
+    shell:
+        """
+        sourmash sig cat {input.directsketch} {input.curated} -o {output.combined} 2> {log}
+        """
+
+# rule build_taxonomy:
+#     input:
+#         vmr_file = vmr_file,
+#         directsketch=os.path.join(out_dir, f"{basename}.directsketch.csv"),
+#         curated=os.path.join(out_dir, f"curated/{basename}.curate.fromfile.csv"),
+#         combined=os.path.join(out_dir, f"{basename}.combined.zip"),
 #     output:
-#         nucl= protected(os.path.join(out_dir, "curated/nucleotide/{vmr_acc}.fna.gz")),
-#         fileinfo= protected(os.path.join(out_dir, "curated/fileinfo/{vmr_acc}.fileinfo.csv")),
+#         tax = os.path.join(out_dir, f'{basename}.taxonomy.tsv'),
+#         prot_tax = os.path.join(out_dir, f'{basename}.protein-taxonomy.csv'), #columns prot_name, dna_acc, full_lineage
 #     params:
-#         prot_dir= os.path.join(out_dir, "curated/protein"),
-#         prot_out=protected(os.path.join(out_dir, "curated/protein/{vmr_acc}.faa.gz")),
-#     log: os.path.join(logs_dir, "curate_fasta", "{vmr_acc}.log")
-#     benchmark: os.path.join(logs_dir, "curate_fasta", "{vmr_acc}.benchmark")
-#     threads: 1
-#     resources:
-#         mem_mb=3000,
-#         time=90,
-#         partition="med2",
+#         suppressed_records = ' '.join(suppressed_records),
+#     conda: 'conf/env/reports.yml'
+#     log:  os.path.join(logs_dir, "build_taxonomy", f"{basename}.log")
+#     benchmark:  os.path.join(logs_dir, "build_taxonomy", f"{basename}.benchmark")
 #     shell:
 #         """
-#         mkdir -p {params.prot_dir}
-#         python curate-fasta.py --input-fileinfo {input.fileinfo} --curated-acc {wildcards.vmr_acc} \
-#                                --nucl-out {output.nucl} --prot-out {params.prot_out} \
-#                                --fileinfo-out {output.fileinfo} 2> {log}
+#         python -Werror make-tax.py --vmr-tsv {input.vmr_file} \
+#                                    --fromfile {input.fromfile} \
+#                                    --output {output.tax} \
+#                                    --suppressed-records {params.suppressed_records} 2> {log}
 #         """
 
-# if genome download failed, download genome fasta so we can translate it
+## RULES FOR PROTEINS
+
+# if proteome download failed, download genome fasta so we can translate it
 # rule directsketch_get_fasta_for_failures:
 #     input:
 #         csvfile = os.path.join(out_dir, f"{basename}.directsketch-failed.csv"),

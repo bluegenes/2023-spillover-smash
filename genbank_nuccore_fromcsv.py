@@ -45,7 +45,7 @@ def download_and_join_fastas(accession_list, nucleotide_file, protein_file):
                 nucl_seqs.append((acname + acc, nucleotide_sequence))
             except UndefinedSequenceError:
                 sys.stderr.write(f"Could not find sequence for accession {acc}: record.seq is undefined.\n")
-                failed_accinfo.append((acname + acc, "DNA"))
+                failed_accinfo.append(f"{acname + acc}: DNA")
 
             # Protein sequences
             protein_sequences = []
@@ -53,27 +53,29 @@ def download_and_join_fastas(accession_list, nucleotide_file, protein_file):
                 if feature.type == "CDS" and "translation" in feature.qualifiers:
                     protein_sequences.append((feature.qualifiers["translation"][0], feature.qualifiers["protein_id"][0]))
             if not protein_sequences:
-                failed_accinfo.append((acname + acc, "protein"))
+                failed_accinfo.append(f"{acname + acc}: protein")
             prot_seqs.append((acname + acc, protein_sequences))
 
         except Exception as e:
             sys.stderr.write(f"Failed to download FASTA for {acc}: {str(e)}\n")
-            failed_accinfo.append((acname + acc, "DNA"))
-            failed_accinfo.append((acname + acc, "protein"))
+            failed_accinfo.append(f"{acname + acc}: DNA")
+            failed_accinfo.append(f"{acname + acc}: protein")
 
     nucl_len = 0
     prot_len = 0
     # Save the sequences to gzip-compressed FASTA files
     if nucl_seqs:
         with gzip.open(nucleotide_file, "wt") as f:
-            for ac, seq in enumerate(nucl_seqs):
-                nucl_len+=len(seq)
+            for ac, seq in nucl_seqs:
+                seqlen = len(seq)
+                nucl_len+=seqlen
                 f.write(f">{ac}\n{seq}\n")
     if prot_seqs:
         with gzip.open(protein_file, "wt") as f:
             for ac, seqs in prot_seqs:
                 for i, (protein_sequence, protein_id) in enumerate(seqs):
-                    prot_len+=len(protein_sequence)
+                    seqlen = len(protein_sequence)
+                    prot_len+=seqlen
                     f.write(f">{ac}_CDS{i+1}|{protein_id}\n{protein_sequence}\n")
     else:
         protein_file = None
@@ -133,7 +135,7 @@ def main(args):
     # Write fileinfo to a CSV file
     with open(args.fromfile, "w") as csvfile:
         writer = csv.writer(csvfile)
-        writer.writerow(["ident", "name", "genome_file", "protein_file"])
+        writer.writerow(["name", "genome_filename", "protein_filename"])
         for info in all_fileinfo:
             writer.writerow(info)
 
