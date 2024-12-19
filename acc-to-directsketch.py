@@ -1,5 +1,6 @@
 import argparse
 import csv
+from sourmash.tax.tax_utils import ICTVRankLineageInfo, ICTV_RANKS
 
 
 def extract_accs(id_col):
@@ -54,34 +55,44 @@ def main(args):
          open(args.curated_ds, 'w') as curated_ds, \
          open(args.curate_info, 'w') as curate_info, \
          open(args.suppressed, 'w') as suppressed, \
+         open(args.lineages, 'w') as lineages, \
          open(args.lengths, 'w') as lengths:
         
         ds_csv.write("accession,name,ftp_path\n")
         curated_ds.write("accession,name,moltype,md5sum,download_filename,url,range\n")
         curate_info.write("name,assembly_failure,genbank_accessions\n")
         lengths.write("accession,length\n")
+        lineages_header = ["ident", *ICTV_RANKS]
+        lineages.write(','.join(lineages_header) + '\n')
         
         r = csv.DictReader(infp, delimiter='\t')
+        # lowercase all column names so that ranks match sourmash ICTV ranks
+        r.fieldnames = [field.lower() for field in r.fieldnames]
         suppressed.write(','.join(r.fieldnames) + '\n')
         
         for row in r:
-            acc = row['GenBank Assembly ID']
-            virus_name = f"{row['Virus name(s)']} {row['Virus isolate designation']}".strip().replace(',', ';')
+            acc = row['genbank assembly id']
+            virus_name = f"{row['virus name(s)']} {row['virus isolate designation']}".strip().replace(',', ';')
+            row['name'] = virus_name
+            lineage = ICTVRankLineageInfo(lineage_dict=row)
             
             if acc and acc not in bad_accs:
                 name = f"{acc} {virus_name}"
                 genome_length, ftp_path = acc2info.get(acc, ("", ""))
                 ds_csv.write(f"{acc},{name},{ftp_path}\n")
                 lengths.write(f"{acc},{genome_length}\n")
+                lineages_row = [acc, *lineage.zip_lineage()]
+                lineages.write(','.join(lineages_row) + '\n')
             else:
                 if acc:
                     print(f"Skipping {acc} for {virus_name} due to historical suppression or failure.")
                     suppressed.write(','.join(row.values()) + '\n')
 
-                gb_col = row["Virus GENBANK accession"]
+                gb_col = row["virus genbank accession"]
                 if gb_col == "":
+                    # skip anything where we don't have any sequence
                     continue
-                vmr_acc = f"{args.basename}_{row['Species Sort']}"
+                vmr_acc = f"{args.basename}_{row['species sort']}_{row['isolate sort']}"
                 curated_name = f"{vmr_acc} {virus_name}".strip()
                 dl_filename = f"genbank/curated/{vmr_acc}.fna"
                 # here, handle multiple acc input styles:
@@ -102,10 +113,12 @@ def main(args):
                 # write directsketch download file
                 if dl_info is not None:
                     curated_ds.write(f"{vmr_acc},{curated_name},DNA,,{dl_filename},{dl_info},{range}\n")
+                    lineages_row = [vmr_acc, *lineage.zip_lineage()]
+                    lineages.write(','.join(lineages_row) + '\n')
                 else:
                     print("dl info was None")
                 # write info on failure reason
-                fail_reason = row['GenBank Failures']
+                fail_reason = row['genbank failures']
                 curate_info.write(f"{curated_name},{fail_reason},{gb_acc}\n")
 
 
@@ -116,6 +129,7 @@ if __name__ == "__main__":
     parser.add_argument("--bad_acc", required=True, help="Path to the historical (suppressed) GenBank assembly summary file.")
     parser.add_argument("--ds_csv", required=True, help="Output directsketch CSV file.")
     parser.add_argument("--curated_ds", required=True, help="Output curated directsketch CSV file.")
+    parser.add_argument("--lineages", required=True, help="Output sourmash taxonomy lineages CSV file.")
     parser.add_argument("--curate_info", required=True, help="Output curation information CSV file.")
     parser.add_argument("--suppressed", required=True, help="Output suppressed accessions CSV file.")
     parser.add_argument("--lengths", required=True, help="Output genome lengths CSV file.")
