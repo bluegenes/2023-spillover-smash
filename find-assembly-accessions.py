@@ -1,3 +1,4 @@
+import os
 import sys
 import argparse
 import csv
@@ -5,6 +6,26 @@ from Bio import Entrez
 
 # Set email address for NCBI access
 Entrez.email = "ntpierce@ucdavis.edu"
+
+def load_processed_rows(output_file):
+    """
+    Load processed rows from the output file.
+
+    Args:
+        output_file (str): Path to the output TSV file.
+
+    Returns:
+        set: A set of processed 'Virus GENBANK accession' values.
+    """
+    processed = {}
+    if os.path.exists(output_file):
+        with open(output_file, 'r') as outF:
+            reader = csv.DictReader(outF, delimiter='\t')
+            for row in reader:
+                if row["Virus GENBANK accession"] and row["GenBank Assembly ID"]:
+                    acc = row["Virus GENBANK accession"]
+                    processed[acc] = row
+    return processed
 
 def retrieve_assembly_accession(identifier):
     """
@@ -124,10 +145,6 @@ def find_assembly_accessions(row):
     # Add the assembly IDs to the row
     row["GenBank Assembly ID"] = genbank_assembly_id
     row["GenBank Failures"] = ";".join(genbank_failures)
-    # we _could_ search these too, but datasets accession should be identical except for GCF/GCA difference
-    #refseq_assembly_id, refseq_failures = retrieve_acc(row["Virus REFSEQ accession"])
-    #row["RefSeq Assembly ID"] = refseq_assembly_id
-    #row["RefSeq Failures"] = ",".join(refseq_failures)
     return row
 
 
@@ -148,13 +165,22 @@ def main(args):
         ds = open(args.output_directsketch, 'w')
         ds.write("accession,name,ftp_path\n")
     
+    # Load processed rows if the output file exists
+    if args.existing_vmr:
+        processed = load_processed_rows(args.existing_vmr)
+
     # read in the file with tsv, loop through to link to assembly dataset information
     with open(input_vmr, 'r') as inF, open(args.output_vmr, 'w', newline='') as out_acc:
         reader = csv.DictReader(inF, delimiter='\t')
-        fieldnames = reader.fieldnames + ["GenBank Assembly ID", "GenBank Failures"]#, "RefSeq Assembly ID", "RefSeq Failures"]
+        fieldnames = reader.fieldnames + ["GenBank Assembly ID", "GenBank Failures"]
         writer = csv.DictWriter(out_acc, fieldnames=fieldnames, delimiter='\t') # there are commas in some columns, so use tab
         writer.writeheader()
         for n, row in enumerate(reader):
+            gb_acc = row["Virus GENBANK accession"]
+            if gb_acc in processed.keys():
+                processed_row = processed[gb_acc]
+                writer.writerow(processed_row)
+                continue  # Skip re-processing already processed rows
             if n % 500 == 0:
                 print(f"Processed {n} accessions...")
             row = find_assembly_accessions(row)
@@ -166,9 +192,10 @@ def main(args):
 def cmdline(sys_args):
     "Command line entry point w/argparse action."
     p = argparse.ArgumentParser()
-    p.add_argument("-i", "--input-vmr", default= "inputs/VMR_MSL38_v1.xlsx")
-    p.add_argument("-o", "--output-vmr", default='inputs/VMR_MSL38_v1.acc.tsv')
-    p.add_argument("-s", "--sheet-name", default='VMR MSL38 v1')
+    p.add_argument("-i", "--input-vmr", default= "inputs/VMR_MSL39.v4_20241106.xlsx")
+    p.add_argument("-o", "--output-vmr", default='inputs/VMR_MSL39.v4_20241106.acc.tsv')
+    p.add_argument("-p", "--existing-vmr", default='inputs/VMR_MSL39.v4_20241106.acc.bak.tsv')
+    p.add_argument("-s", "--sheet-name", default='VMR MSL39')
     p.add_argument("-c", "--only-convert", action='store_true', default=False, help="Only convert excel to tsv, then exit.")
     p.add_argument("--output-directsketch", help="optionally, output file for sourmash_plugin_directsketch use")
     args = p.parse_args()
@@ -177,13 +204,3 @@ def cmdline(sys_args):
 if __name__ == '__main__':
     returncode = cmdline(sys.argv[1:])
     sys.exit(returncode)
-
-
-def test_retrieve_assembly_accession():
-    # Test valid input
-    assert retrieve_assembly_accession("MK064563") == "GCF_003950175.1"
-    # Test valid multiple inputs:
-#    assert get_assembly_id("dsRNA 1: HG975302; dsRNA 2: HG975303; dsRNA 3: HG975304; dsRNA 4: HG975305") == "GCA_013138185.1"
-    #assert retrieve_assembly_accession("HG975302") == "GCA_013138185.1"
-    # Test invalid input
-    assert retrieve_assembly_accession("invalid_identifier") == None

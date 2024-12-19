@@ -8,91 +8,19 @@ logs_dir = os.path.join(out_dir, 'logs')
 
 # full VMR
 basename = "vmr_MSL39_v1"
-vmr_file = 'inputs/VMR_MSL39_v1.acc.bak.tsv'
+ # first use find-assembly-accessions.py to generate this file.
+vmr_file = 'inputs/VMR_MSL39.v4_20241106.acc.tsv'
 vmr = pd.read_csv(vmr_file, sep='\t')
-
-# suppressed_records = ['GCF_002987915.1', 'GCF_002830945.1', 'GCF_002828705.1', 'GCA_004789135.1']
-# set GenBank Failures dtype to str
-# vmr['GenBank Failures'] = vmr['GenBank Failures'].astype(str)
-# add 'suppressed' into GenBank Failure column for these records
-# vmr.loc[vmr['GenBank Assembly ID'].isin(suppressed_records), 'GenBank Failures'] = 'suppressed'
-
-# null_list = ["", np.nan] + suppressed_records
-# ACCESSIONS = [a for a in vmr['GenBank Assembly ID'] if a and a not in null_list] # don't keep "" entries
-
-########################################################################
-#### Handle VMR entries with no GenBank Assembly ID or other issues ####
-# vmr38_v1: retrieval failures happened for the second of two accs, meaning we still got the valid assembly accession.
-# parentheses --> numbers are not the base pair ranges we actually need?
-# get working for rest first, then handle parens later
-# VMR_ACCESSIONS = []
-# vmr_to_genbank = {}
-# curate_info = ['suppressed', 'no_assembly', 'multiple_acc'] #, 'parentheses']#, 'retrieval']
-# # now select all rows in vmr that had a GenBank Failure
-# curate_vmr = vmr.copy()[vmr['GenBank Failures'].isin(curate_info)]
-
-# get clean list of genbank nucleotide accession(s)
-def clean_genbank_accs(row):
-    genbank_acc = row['Virus GENBANK accession'].split(';')
-    # check if ':' is in any and split on that
-    for i, acc in enumerate(genbank_acc):
-        if ':' in acc:
-            genbank_acc[i] = acc.split(':')[1]
-        if '(' in acc:
-            genbank_acc[i] = acc.split('(')[0]
-        genbank_acc[i] = genbank_acc[i].strip()
-    return genbank_acc
-
-# if we have rows that need to be curated, find genbank accessions and build vmr_to_genbank dictionary
-# if not curate_vmr.empty:
-#     curate_vmr['VMR_Accession'] = 'VMR_MSL38_' + curate_vmr['Sort'].astype(str)
-#     VMR_ACCESSIONS = curate_vmr['VMR_Accession'].tolist()
-#     parentheses_acc = curate_vmr[curate_vmr['GenBank Failures'] == 'parentheses']['VMR_Accession'].tolist()
-    
-#     curate_vmr.loc[:, 'genbank_accessions'] = curate_vmr.apply(clean_genbank_accs, axis=1)
-#     # get dictionary of vmr accession to genbank accession(s)
-#     vmr_to_genbank = dict(zip(curate_vmr['VMR_Accession'], curate_vmr['genbank_accessions']))
-########################################################################
 
 wildcard_constraints:
     acc = '[^/]+',
     vmr_acc = '[^/]+',
 
-# class Checkpoint_MakePattern:
-#     def __init__(self, pattern):
-#         self.pattern = pattern
-    
-#     def get_filenames(self, basename=None, moltype=None):
-#         df = pd.read_csv(f"{out_dir}/{basename}.fromfile.csv")
-#         filename_col = 'genome_filename'
-#         if moltype == "protein":
-#             filename_col = 'protein_filename'
-#         # filter df to get non-empties in relevant column
-#         fastas = df[filename_col][df[filename_col].notnull()].tolist()
-
-#         return fastas
-
-#     def __call__(self, w):
-#         global checkpoints
-#         # wait for the results of 'check_fromfile'; this will trigger an
-#         # exception until that rule has been run.
-#         checkpoints.check_fromfile.get(**w)
-#         #expand the pattern
-#         fastas = self.get_filenames(**w)
-
-#         pattern = expand(self.pattern, fn =fastas,**w)
-#         return pattern
-
 rule all:
     input:
-        os.path.join(out_dir, f"{basename}.directsketch.zip"),
-        os.path.join(out_dir, f"curated/{basename}.curate.fromfile.csv"),
-        os.path.join(out_dir, f"curated/{basename}.curate.zip"),
+        os.path.join(out_dir, f"{basename}.gbsketch.zip"),
+        os.path.join(out_dir, f"{basename}.curate-ds.zip"),
         os.path.join(out_dir, f"{basename}.combined.zip"),
-        # expand(os.path.join(out_dir, f"{basename}.{{moltype}}.zip"), moltype = ['dna', 'protein']),
-        # os.path.join(out_dir, f'{basename}.taxonomy.csv'),
-        # os.path.join(out_dir, f'{basename}.protein-taxonomy.csv'),
-        # expand(os.path.join(out_dir, f"{basename}.{{moltype}}.lengths.csv"), moltype = ['dna', 'protein']),
 
 
 ### Rules for ICTV GenBank Assemblies:
@@ -107,123 +35,37 @@ rule download_assembly_summary:
         """
 
 rule acc_to_directsketch:
-    input: 
+    input:
         vmr_file = vmr_file,
         good_acc = 'genbank/assembly_summary.viral.txt',
         bad_acc = 'genbank/assembly_summary_historical.txt',
     output:
-        ds_csv = os.path.join(out_dir, f"{basename}.directsketch.csv"),
-        curated_ds = os.path.join(out_dir, f"{basename}.curate-directsketch.csv"),
+        ds_csv = os.path.join(out_dir, f"{basename}.gbsketch.csv"),
+        curated_ds = os.path.join(out_dir, f"{basename}.curate-urlsketch.csv"),
         curate_info = os.path.join(out_dir, f"{basename}.ncfasta-to-curate.csv"),
         suppressed = os.path.join(out_dir, f"{basename}.suppressed.csv"),
         lengths = os.path.join(out_dir, f"{basename}.lengths.csv"),
-    threads: 1
-    resources:
-        mem_mb=3000,
-        disk_mb=5000,
-        runtime=90,
-        time=60,
-        partition="low2",
-    run:
-       # open the assembly summary files and get the "good" (current) and "bad" (historical, suppressed) accessions
-        acc2info = {}
-        with open(input.good_acc, 'rt') as gacc:
-            # good_accs = set()
-            r = csv.reader(gacc, delimiter='\t')
-            for row in r: 
-                if row[0].startswith('#'):
-                    continue
-                # good_accs.add(row[0])
-                acc = row[0]
-                gcf_acc = row[0].replace("GCA", "GCF")
-                len = row[25] # get genome length! (so we don't need to dl fasta to count :) 
-                ftp_path = row[19]
-                acc2info[acc] =  (len,ftp_path)
-                acc2info[gcf_acc] = (len,ftp_path)
-        with open(input.bad_acc, 'rt') as bacc:
-            bad_accs = set()
-            r = csv.reader(bacc, delimiter='\t')
-            for row in r:
-                if row[0].startswith('#'):
-                    continue
-                acc = row[0]
-                gcf_acc = row[0].replace("GCA", "GCF")
-                bad_accs.add(acc)
-                bad_accs.add(gcf_acc)
-        # open the vmr file and write directsketch (gbsketch) file for "good" (current) accessions
-        curate_ds = open(output.curated_ds, 'w')
-        curate_ds.write("accession,name,moltype,md5sum,download_filename,url\n")
-        # write a file with info for curation
-        curate_info = open(output.curate_info, 'w')
-        curate_info.write("name,assembly_failure,genbank_accessions\n")
-        lengths = open(output.lengths, 'w')
-        lengths.write("accession,length\n")
-        with open(vmr_file, 'rt') as infp, open(output.ds_csv, 'w') as outF, open(output.suppressed, 'w') as supF:
-            outF.write("accession,name,ftp_path\n")
-            r = csv.DictReader(infp, delimiter='\t')
-            # write row header to supF
-            supF.write(','.join(r.fieldnames) + '\n')
-            for row in r:
-                fail_reason = None
-                acc = row['GenBank Assembly ID']
-                if acc and acc not in bad_accs:# and acc in acc2info.keys(): 
-                    name = row['GenBank Assembly ID'] + ' ' +  row['Virus name(s)'] + ' ' + row['Virus isolate designation']
-                    name = name.strip()
-                    if ',' in name:
-                        name = name.replace(',', ';')
-                    len, ftp_path = acc2info.get(acc, ("", ""))
-                    outF.write(f"{acc},{name},{ftp_path}\n")
-                    lengths.write(f"{acc},{len}\n")
-                else:
-                    # this should include ALL failures, including failure to find assembly, suppressed records, etc
-                    # write file with "bad" historial accessions so we can curate from their non-assembly dataset records
-                    # may not always be desirable, b/c they were likely suppressed for a reason.
-                    virus_name = row['Virus name(s)'] + ' ' + row['Virus isolate designation'] #+ '; genbank accs: ' + row["Virus GENBANK accession"]
-                    virus_name = virus_name.strip()
-                    if ',' in virus_name:
-                        virus_name = virus_name.replace(',', ';')
-                    gb_acc = row["Virus GENBANK accession"]
-                    if acc:
-                        print(f"Skipping {acc} for {virus_name} because it is in the historical assembly summary (suppressed)")
-                        row['GenBank Failures'] = "suppressed"
-                        supF.write(','.join(row.values()) + '\n')
-                    else:
-                        print(f"Failed to find GenBank Assembly ID for {virus_name}")
-                    
-                    print(f"using GenBank accessions instead (non-assembly): {gb_acc}")
-                    # write separate directsketch (urlsketch) w/ links for genbank accessions that have no assembly
-                    for gba in gb_acc.split(';'):
-                        gba = gba.strip()
-                        if gba:
-                            this_name = gba + ' ' + virus_name
-                            moltype = "DNA"
-                            md5sum = ""
-                            dl_filename = f"genbank/nuccore/{gba}.fna"
-                            # dl_link = f"https://www.ncbi.nlm.nih.gov/sviewer/viewer.cgi?db=nuccore&id={gba}&report=fasta&retmode=text"
-                            dl_link = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&id={gba}&rettype=fasta&retmode=text"
-                            curate_ds.write(f"{gba},{this_name},{moltype},{md5sum},{dl_filename},{dl_link}\n")
-                    
-                    # create new name for record so we can combine segments if needed
-                    vmr_acc = basename + '_'+ str(row['Sort'])
-                    curated_name = vmr_acc + ' ' + virus_name
-                    curated_name = curated_name.strip()
-                    fail_reason = row['GenBank Failures']
-                    curate_info.write(f"{curated_name},{fail_reason},{row['Virus GENBANK accession']}\n")
-
-                        # parentheses_acc = curate_vmr[curate_vmr['GenBank Failures'] == 'parentheses']['VMR_Accession'].tolist()
-                        # curate_vmr.loc[:, 'genbank_accessions'] = curate_vmr.apply(clean_genbank_accs, axis=1)
-                        # get dictionary of vmr accession to genbank accession(s)
-                        # vmr_to_genbank = dict(zip(curate_vmr['VMR_Accession'], curate_vmr['genbank_accessions']))
-        curate_ds.close()
-        curate_info.close()
-        lengths.close()
+    shell:
+        """
+        python acc_to_directsketch.py \
+            --vmr_file {input.vmr_file} \
+            --good_acc {input.good_acc} \
+            --bad_acc {input.bad_acc} \
+            --ds_csv {output.ds_csv} \
+            --curated_ds {output.curated_ds} \
+            --curate_info {output.curate_info} \
+            --suppressed {output.suppressed} \
+            --lengths {output.lengths} \
+            --basename {basename}
+        """
 
 rule directsketch_assembly_datasets:
     input:
-        csvfile = os.path.join(out_dir, f"{basename}.directsketch.csv"),
+        csvfile = os.path.join(out_dir, f"{basename}.gbsketch.csv"),
     output:
-        zipf = os.path.join(out_dir, f"{basename}.directsketch.zip"),
-        failed = os.path.join(out_dir, f"{basename}.dna-directsketch-failed.csv"),
+        zipf = os.path.join(out_dir, f"{basename}.gbsketch.zip"),
+        failed = os.path.join(out_dir, f"{basename}.gbsketch-assemblies-failed.csv"),
+        ch_failed = os.path.join(out_dir, f"{basename}.gbsketch-assemblies-checksum-failed.csv"),
     threads: 1
     resources:
         mem_mb=3000,
@@ -232,27 +74,29 @@ rule directsketch_assembly_datasets:
         time=90,
         partition="low2",
     conda: "conf/env/directsketch.yml"
-    log: os.path.join(logs_dir, "directsketch", f"{basename}.log")
-    benchmark: os.path.join(logs_dir, "directsketch", f"{basename}.benchmark")
+    log: os.path.join(logs_dir, "directsketch", f"{basename}.gbsketch.log")
+    benchmark: os.path.join(logs_dir, "directsketch", f"{basename}.gbsketch.benchmark")
     shell:
         """
         sourmash scripts gbsketch -o {output.zipf} {input.csvfile} \
-                                  -p dna,k=21,k=31,scaled=1,abund \
-                                  -p protein,k=7,k=10,scaled=1,abund \
+                                  -p dna,k=21,k=31,scaled=5 \
+                                  -p skipm2n3,k=15,k=17,k=19,k=21,scaled=5 \
+                                  -p skipm2n3,k=15,k=17,k=19,k=21,k=23,k=25,scaled=5
                                   --failed {output.failed} 2> {log}
         """
+                                  #-p protein,k=7,k=10,scaled=1,abund \
+
 ### still need to get FASTA length info -- can I get it from ncbi somehow?
 ### for curated accessions, we need to download the fasta files from GenBank + find the protein accessions + their FASTA
 
 # # Where we don't have assembly datasets, curate fasta files from GenBank nuccore
-rule download_join_nuccore_fasta:
-    input:
-        curate_info = os.path.join(out_dir, f"{basename}.ncfasta-to-curate.csv"),
+# here, we use directsketch to merge the component fastas into a single sketch
+rule directsketch_curated:
+    input: 
+        os.path.join(out_dir, f"{basename}.curate-urlsketch.csv"),
     output:
-        fromfile = os.path.join(out_dir, f"curated/{basename}.curate.fromfile.csv"),
-        failed = os.path.join(out_dir, f"curated/{basename}.curate.failed.csv"),
-        nucl_lengths = os.path.join(out_dir, f"curated/{basename}.curate.nucl-lengths.csv"),
-        prot_lengths = os.path.join(out_dir, f"curated/{basename}.curate.protein-lengths.csv"),
+        zipf = os.path.join(out_dir, f"{basename}.curate-ds.zip"), 
+        failed = os.path.join(out_dir, f"{basename}.curate-ds-failed.csv"),
     threads: 1
     resources:
         mem_mb=3000,
@@ -260,45 +104,23 @@ rule download_join_nuccore_fasta:
         runtime=60,
         time=90,
         partition="low2",
-    conda: "conf/env/biopython.yml"
-    params:
-        fastadir= os.path.join(out_dir, "curated", f"{basename}")
-    log: os.path.join(logs_dir, "nuccore-curate", f"{basename}.curate.log")
-    benchmark: os.path.join(logs_dir, "nuccore-curate", f"{basename}.curate.benchmark")
+    conda: "conf/env/directsketch.yml"
+    log: os.path.join(logs_dir, "ds-curate", f"{basename}.curate.log")
+    benchmark: os.path.join(logs_dir, "ds-curate", f"{basename}.curate.benchmark")
     shell:
         """
-        mkdir -p {params.fastadir}
-        python genbank_nuccore_fromcsv.py {input.curate_info} \
-        --fromfile {output.fromfile} --failed {output.failed} \
-        -o {params.fastadir} --nucl-lengths {output.nucl_lengths} \
-        --prot-lengths {output.prot_lengths} 2> {log}
+        sourmash scripts urlsketch -o {output.zipf} {input} \
+                                  -p dna,k=21,k=31,scaled=5 \
+                                  -p skipm2n3,k=15,k=17,k=19,k=21,scaled=5 \
+                                  -p skipm2n3,k=15,k=17,k=19,k=21,k=23,k=25,scaled=5
+                                  --failed {output.failed} 2> {log}
         """
-
-rule sketch_curated:
-    input:
-        fromfile = os.path.join(out_dir, f"curated/{basename}.curate.fromfile.csv"),
-    output:
-        zipf = os.path.join(out_dir, f"curated/{basename}.curate.zip"),
-    threads: 1
-    resources:
-        mem_mb=3000,
-        disk_mb=5000,
-        runtime=60,
-        time=90,
-        partition="low2",
-    conda: "conf/env/branchwater.yml"
-    log: os.path.join(logs_dir, "curated-sketch", f"{basename}.log")
-    benchmark: os.path.join(logs_dir, "curated-sketch", f"{basename}.benchmark")
-    shell:
-        """
-        sourmash scripts manysketch {input.fromfile} -p dna,k=21,k=31,scaled=1,abund \
-                                    -o {output.zipf} 2> {log}
-        """
+                                  #-p protein,k=7,k=10,scaled=100 \
 
 rule combine_sigs:
     input:
-        directsketch = os.path.join(out_dir, f"{basename}.directsketch.zip"),
-        curated = os.path.join(out_dir, f"curated/{basename}.curate.zip"),
+        directsketch = os.path.join(out_dir, f"{basename}.gbsketch.zip"),
+        curated = os.path.join(out_dir, f"{basename}.curate-ds.zip"),
     output:
         combined = os.path.join(out_dir, f"{basename}.combined.zip"),
     threads: 1
