@@ -73,7 +73,7 @@ rule directsketch_assembly_datasets:
         runtime=60,
         time=90,
         partition="low2",
-    conda: "/Users/ntward/miniforge3/envs/directsketch"
+    conda: "directsketch"
     #conda: "conf/env/directsketch.yml"
     log: os.path.join(logs_dir, "directsketch", f"{basename}.gbsketch.log")
     benchmark: os.path.join(logs_dir, "directsketch", f"{basename}.gbsketch.benchmark")
@@ -105,7 +105,7 @@ rule directsketch_curated:
         runtime=60,
         time=90,
         partition="low2",
-    conda: "/Users/ntward/miniforge3/envs/directsketch"
+    conda: "directsketch"
     #conda: "conf/env/directsketch.yml"
     log: os.path.join(logs_dir, "ds-curate", f"{basename}.curate.log")
     benchmark: os.path.join(logs_dir, "ds-curate", f"{basename}.curate.benchmark")
@@ -132,7 +132,7 @@ rule combine_sigs:
         runtime=60,
         time=90,
         partition="low2",
-    conda: "/Users/ntward/miniforge3/envs/directsketch"
+    conda: "directsketch"
     #conda: "conf/env/branchwater.yml"
     log: os.path.join(logs_dir, "combine-sketches", f"{basename}.log")
     benchmark: os.path.join(logs_dir, "combine-sketches", f"{basename}.benchmark")
