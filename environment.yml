@@ -7,4 +7,5 @@ dependencies:
   - python=3.10
   - snakemake=7.25.0
   - screed>1,<2
-  - pandas>=1.5.3
+  - pandas>=2.2.3
+  - sourmash>=4.8.12,<5

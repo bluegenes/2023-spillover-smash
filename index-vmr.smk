@@ -7,7 +7,7 @@ out_dir = "output.vmr"
 logs_dir = os.path.join(out_dir, 'logs')
 
 # full VMR
-basename = "vmr_MSL39_v1"
+basename = "vmr_MSL39_v4"
  # first use find-assembly-accessions.py to generate this file.
 vmr_file = 'inputs/VMR_MSL39.v4_20241106.acc.tsv'
 vmr = pd.read_csv(vmr_file, sep='\t')
@@ -82,7 +82,7 @@ rule directsketch_assembly_datasets:
         sourmash scripts gbsketch -o {output.zipf} {input.csvfile} \
                                   -p dna,k=21,k=31,scaled=5 \
                                   -p skipm2n3,k=15,k=17,k=19,k=21,scaled=5 \
-                                  -p skipm2n3,k=15,k=17,k=19,k=21,k=23,k=25,scaled=5
+                                  -p skipm2n3,k=15,k=17,k=19,k=21,k=23,k=25,scaled=5 \
                                   --failed {output.failed} 2> {log}
         """
                                   #-p protein,k=7,k=10,scaled=1,abund \
