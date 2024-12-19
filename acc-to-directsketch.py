@@ -74,11 +74,13 @@ def main(args):
                 ds_csv.write(f"{acc},{name},{ftp_path}\n")
                 lengths.write(f"{acc},{genome_length}\n")
             else:
-
-                print(f"Skipping {acc} for {virus_name} due to historical suppression or failure.")
-                suppressed.write(','.join(row.values()) + '\n')
+                if acc:
+                    print(f"Skipping {acc} for {virus_name} due to historical suppression or failure.")
+                    suppressed.write(','.join(row.values()) + '\n')
 
                 gb_col = row["Virus GENBANK accession"]
+                if gb_col == "":
+                    continue
                 vmr_acc = f"{args.basename}_{row['Species Sort']}"
                 curated_name = f"{vmr_acc} {virus_name}".strip()
                 dl_filename = f"genbank/curated/{vmr_acc}.fna"
@@ -95,11 +97,13 @@ def main(args):
                 # if there's a range provided, add it.
                 # NOTE: accs with range should not have multiple accs to join
                 if "(" in gb_col and ")" in gb_col:
-                    range = gb_col[gb_col.find("(")+1:gb_col.find(")")]
+                    range = gb_col[gb_col.find("("):gb_col.find(")")+1]
                     range = range.replace('.', ':')
-                    print(f"({range})")
                 # write directsketch download file
-                curated_ds.write(f"{vmr_acc},{curated_name},DNA,,{dl_filename},{dl_info},({range})\n")
+                if dl_info is not None:
+                    curated_ds.write(f"{vmr_acc},{curated_name},DNA,,{dl_filename},{dl_info},{range}\n")
+                else:
+                    print("dl info was None")
                 # write info on failure reason
                 fail_reason = row['GenBank Failures']
                 curate_info.write(f"{curated_name},{fail_reason},{gb_acc}\n")

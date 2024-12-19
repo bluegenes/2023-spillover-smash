@@ -47,7 +47,7 @@ rule acc_to_directsketch:
         lengths = os.path.join(out_dir, f"{basename}.lengths.csv"),
     shell:
         """
-        python acc_to_directsketch.py \
+        python acc-to-directsketch.py \
             --vmr_file {input.vmr_file} \
             --good_acc {input.good_acc} \
             --bad_acc {input.bad_acc} \
@@ -73,7 +73,8 @@ rule directsketch_assembly_datasets:
         runtime=60,
         time=90,
         partition="low2",
-    conda: "conf/env/directsketch.yml"
+    conda: "/Users/ntward/miniforge3/envs/directsketch"
+    #conda: "conf/env/directsketch.yml"
     log: os.path.join(logs_dir, "directsketch", f"{basename}.gbsketch.log")
     benchmark: os.path.join(logs_dir, "directsketch", f"{basename}.gbsketch.benchmark")
     shell:
@@ -104,7 +105,8 @@ rule directsketch_curated:
         runtime=60,
         time=90,
         partition="low2",
-    conda: "conf/env/directsketch.yml"
+    conda: "/Users/ntward/miniforge3/envs/directsketch"
+    #conda: "conf/env/directsketch.yml"
     log: os.path.join(logs_dir, "ds-curate", f"{basename}.curate.log")
     benchmark: os.path.join(logs_dir, "ds-curate", f"{basename}.curate.benchmark")
     shell:
@@ -112,7 +114,7 @@ rule directsketch_curated:
         sourmash scripts urlsketch -o {output.zipf} {input} \
                                   -p dna,k=21,k=31,scaled=5 \
                                   -p skipm2n3,k=15,k=17,k=19,k=21,scaled=5 \
-                                  -p skipm2n3,k=15,k=17,k=19,k=21,k=23,k=25,scaled=5
+                                  -p skipm2n3,k=15,k=17,k=19,k=21,k=23,k=25,scaled=5 \
                                   --failed {output.failed} 2> {log}
         """
                                   #-p protein,k=7,k=10,scaled=100 \
@@ -130,7 +132,8 @@ rule combine_sigs:
         runtime=60,
         time=90,
         partition="low2",
-    conda: "conf/env/branchwater.yml"
+    conda: "/Users/ntward/miniforge3/envs/directsketch"
+    #conda: "conf/env/branchwater.yml"
     log: os.path.join(logs_dir, "combine-sketches", f"{basename}.log")
     benchmark: os.path.join(logs_dir, "combine-sketches", f"{basename}.benchmark")
     shell:
