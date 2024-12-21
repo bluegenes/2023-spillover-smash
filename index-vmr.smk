@@ -7,7 +7,7 @@ out_dir = "output.vmr"
 logs_dir = os.path.join(out_dir, 'logs')
 
 # full VMR
-basename = "vmr_MSL39_v4"
+basename = "vmr_MSL39_v4.sc1"
  # first use find-assembly-accessions.py to generate this file.
 vmr_file = 'inputs/VMR_MSL39.v4_20241106.acc.tsv'
 vmr = pd.read_csv(vmr_file, sep='\t')
@@ -20,7 +20,7 @@ rule all:
     input:
         os.path.join(out_dir, f"{basename}.gbsketch.zip"),
         os.path.join(out_dir, f"{basename}.curate-ds.zip"),
-        os.path.join(out_dir, f"{basename}.combined.zip"),
+        os.path.join(out_dir, f"{basename}.zip"),
 
 
 ### Rules for ICTV GenBank Assemblies:
@@ -45,6 +45,7 @@ rule acc_to_directsketch:
         curate_info = os.path.join(out_dir, f"{basename}.ncfasta-to-curate.csv"),
         suppressed = os.path.join(out_dir, f"{basename}.suppressed.csv"),
         lengths = os.path.join(out_dir, f"{basename}.lengths.csv"),
+        lineages = os.path.join(out_dir, f"{basename}.lineages.csv"),
     shell:
         """
         python acc-to-directsketch.py \
@@ -56,6 +57,7 @@ rule acc_to_directsketch:
             --curate_info {output.curate_info} \
             --suppressed {output.suppressed} \
             --lengths {output.lengths} \
+            --lineages {output.lineages} \
             --basename {basename}
         """
 
@@ -66,6 +68,8 @@ rule directsketch_assembly_datasets:
         zipf = os.path.join(out_dir, f"{basename}.gbsketch.zip"),
         failed = os.path.join(out_dir, f"{basename}.gbsketch-assemblies-failed.csv"),
         ch_failed = os.path.join(out_dir, f"{basename}.gbsketch-assemblies-checksum-failed.csv"),
+    params:
+        fastadir= os.path.join(out_dir, "fastas"),
     threads: 1
     resources:
         mem_mb=3000,
@@ -80,10 +84,11 @@ rule directsketch_assembly_datasets:
     shell:
         """
         sourmash scripts gbsketch -o {output.zipf} {input.csvfile} \
-                                  -p dna,k=21,k=31,scaled=5 \
-                                  -p skipm2n3,k=15,k=17,k=19,k=21,scaled=5 \
-                                  -p skipm2n3,k=15,k=17,k=19,k=21,k=23,k=25,scaled=5 \
-                                  --failed {output.failed} 2> {log}
+                                  -p dna,k=21,k=31,scaled=1 \
+                                  -p skipm2n3,k=15,k=18,k=21,k=24,k=27,scaled=1 \
+                                  -p skipm2n3,k=15,k=18,k=21,k=24,k=27,scaled=1 \
+                                  --keep-fasta --fastas {params.fastadir} \
+                                  --failed {output.failed} --checksum-fail {output.ch_failed} 2> {log}
         """
                                   #-p protein,k=7,k=10,scaled=1,abund \
 
@@ -98,6 +103,8 @@ rule directsketch_curated:
     output:
         zipf = os.path.join(out_dir, f"{basename}.curate-ds.zip"), 
         failed = os.path.join(out_dir, f"{basename}.curate-ds-failed.csv"),
+    params:
+        fastadir= os.path.join(out_dir, "fastas"),
     threads: 1
     resources:
         mem_mb=3000,
@@ -112,9 +119,10 @@ rule directsketch_curated:
     shell:
         """
         sourmash scripts urlsketch -o {output.zipf} {input} \
-                                  -p dna,k=21,k=31,scaled=5 \
-                                  -p skipm2n3,k=15,k=17,k=19,k=21,scaled=5 \
-                                  -p skipm2n3,k=15,k=17,k=19,k=21,k=23,k=25,scaled=5 \
+                                  -p dna,k=21,k=31,scaled=1 \
+                                  -p skipm2n3,k=15,k=18,k=21,k=24,k=27,scaled=1 \
+                                  -p skipm2n3,k=15,k=18,k=21,k=24,k=27,scaled=1 \
+                                  --keep-fasta --fastas {params.fastadir} \
                                   --failed {output.failed} 2> {log}
         """
                                   #-p protein,k=7,k=10,scaled=100 \
@@ -124,7 +132,7 @@ rule combine_sigs:
         directsketch = os.path.join(out_dir, f"{basename}.gbsketch.zip"),
         curated = os.path.join(out_dir, f"{basename}.curate-ds.zip"),
     output:
-        combined = os.path.join(out_dir, f"{basename}.combined.zip"),
+        combined = os.path.join(out_dir, f"{basename}.zip"),
     threads: 1
     resources:
         mem_mb=3000,
