@@ -119,6 +119,7 @@ def main(args):
                         lengths.write(f"{acc},{genome_length}\n")
                         lineages_row = [acc, *lineage.zip_lineage()]
                         lineages.write(','.join(lineages_row) + '\n')
+                        continue # skip rest of loop
                     else:
                         # Skip if no newer version is available
                         print(f"Skipping {acc} for {virus_name} due to historical suppression or failure.")
