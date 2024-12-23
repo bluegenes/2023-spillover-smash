@@ -83,7 +83,7 @@ rule directsketch_assembly_datasets:
     benchmark: os.path.join(logs_dir, "directsketch", f"{basename}.gbsketch.benchmark")
     shell:
         """
-        sourmash scripts gbsketch -o {output.zipf} {input.csvfile} -n 2 \
+        sourmash scripts gbsketch -o {output.zipf} {input.csvfile} -n 1 \
                                   -p dna,k=21,k=31,scaled=1 \
                                   -p skipm2n3,k=15,k=18,k=21,k=24,k=27,scaled=1 \
                                   -p skipm2n3,k=15,k=18,k=21,k=24,k=27,scaled=1 \
@@ -97,7 +97,7 @@ rule directsketch_assembly_datasets:
 ### for curated accessions, we need to download the fasta files from GenBank + find the protein accessions + their FASTA
 
 # # Where we don't have assembly datasets, curate fasta files from GenBank nuccore
-# here, we use directsketch to merge the component fastas into a single sketch
+# here, we use directsketch to merge the component fastas into a single sketch AND take ranges where needed
 rule directsketch_curated:
     input: 
         os.path.join(out_dir, f"{basename}.curate-urlsketch.csv"),

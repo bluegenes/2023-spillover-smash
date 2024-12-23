@@ -9,3 +9,7 @@ dependencies:
   - screed>1,<2
   - pandas>=2.2.3
   - sourmash>=4.8.12,<5
+  - sourmash_plugin_branchwater>=0.9.12,<1
+  - pip
+  - pip:
+    - git+https://github.com/sourmash-bio/sourmash_plugin_directsketch@merged-sigs

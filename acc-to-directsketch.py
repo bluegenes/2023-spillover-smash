@@ -21,9 +21,29 @@ def extract_accs(id_col):
                 split_ids.append(id)
     return split_ids
 
+def find_newer_version(acc, good_accs):
+    """
+    Find a newer version of the given accession in the good accessions list.
+    Returns the newer version if found, otherwise None.
+    """
+    base_acc = acc.rsplit('.', 1)[0]
+    newer_version = None
+    old_version = int(acc.split('.')[-1])
+
+    for good_acc in good_accs:
+        if good_acc.startswith(base_acc):
+            new_version = int(good_acc.split('.')[-1])
+            if new_version > old_version:
+                newer_version = good_acc
+                break  # Take the first newer version found
+
+    return newer_version
+
+
 def main(args):
     acc2info = {}
     bad_accs = set()
+    good_accs = set()
     
     # Read good accessions
     with open(args.good_acc, 'rt') as gacc:
@@ -37,6 +57,8 @@ def main(args):
             ftp_path = row[19]
             acc2info[acc] = (genome_length, ftp_path)
             acc2info[gcf_acc] = (genome_length, ftp_path)
+            good_accs.add(acc)
+            good_accs.add(gcf_acc)
     
     # Read bad accessions
     with open(args.bad_acc, 'rt') as bacc:
@@ -85,8 +107,22 @@ def main(args):
                 lineages.write(','.join(lineages_row) + '\n')
             else:
                 if acc:
-                    print(f"Skipping {acc} for {virus_name} due to historical suppression or failure.")
-                    suppressed.write(','.join(row.values()) + '\n')
+                    # Check for a newer version if the accession is in bad_accs
+                    newer_version = find_newer_version(acc, good_accs)
+
+                    if newer_version:
+                        print(f"Found newer version for {acc}: {newer_version}. Using newer version.")
+                        acc = newer_version
+                        name = f"{acc} {virus_name}"
+                        genome_length, ftp_path = acc2info.get(acc, ("", ""))
+                        ds_csv.write(f"{acc},{name},{ftp_path}\n")
+                        lengths.write(f"{acc},{genome_length}\n")
+                        lineages_row = [acc, *lineage.zip_lineage()]
+                        lineages.write(','.join(lineages_row) + '\n')
+                    else:
+                        # Skip if no newer version is available
+                        print(f"Skipping {acc} for {virus_name} due to historical suppression or failure.")
+                        suppressed.write(','.join(row.values()) + '\n')
 
                 gb_col = row["virus genbank accession"]
                 if gb_col == "":
