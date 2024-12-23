@@ -83,10 +83,11 @@ rule directsketch_assembly_datasets:
     benchmark: os.path.join(logs_dir, "directsketch", f"{basename}.gbsketch.benchmark")
     shell:
         """
-        sourmash scripts gbsketch -o {output.zipf} {input.csvfile} \
+        sourmash scripts gbsketch -o {output.zipf} {input.csvfile} -n 2 \
                                   -p dna,k=21,k=31,scaled=1 \
                                   -p skipm2n3,k=15,k=18,k=21,k=24,k=27,scaled=1 \
                                   -p skipm2n3,k=15,k=18,k=21,k=24,k=27,scaled=1 \
+                                  --genomes-only \
                                   --keep-fasta --fastas {params.fastadir} \
                                   --failed {output.failed} --checksum-fail {output.ch_failed} 2> {log}
         """
@@ -118,10 +119,11 @@ rule directsketch_curated:
     benchmark: os.path.join(logs_dir, "ds-curate", f"{basename}.curate.benchmark")
     shell:
         """
-        sourmash scripts urlsketch -o {output.zipf} {input} \
+        sourmash scripts urlsketch -o {output.zipf} {input} -n 1 \
                                   -p dna,k=21,k=31,scaled=1 \
                                   -p skipm2n3,k=15,k=18,k=21,k=24,k=27,scaled=1 \
                                   -p skipm2n3,k=15,k=18,k=21,k=24,k=27,scaled=1 \
+                                  --genomes-only \
                                   --keep-fasta --fastas {params.fastadir} \
                                   --failed {output.failed} 2> {log}
         """
