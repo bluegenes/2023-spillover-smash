@@ -131,7 +131,7 @@ def main(args):
                     continue
                 vmr_acc = f"{args.basename}_{row['species sort']}_{row['isolate sort']}"
                 curated_name = f"{vmr_acc} {virus_name}".strip()
-                dl_filename = f"genbank/curated/{vmr_acc}.fna"
+                dl_filename = f"{vmr_acc}.fna.gz"
                 # here, handle multiple acc input styles:
                 gb_acc = extract_accs(gb_col)
                 
