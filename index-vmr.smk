@@ -2,6 +2,8 @@ import csv
 import pandas as pd
 import numpy as np
 import urllib
+import gzip
+import screed
 
 basename = "vmr_MSL39_v4"
 out_dir = f"output.{basename}"
@@ -27,13 +29,21 @@ for moltype in moltypes:
     combo = expand(f"{moltype}-k{{k}}-sc{{sc}}", k=ksizes, sc=scaleds)
     param_combos.extend(combo)
 
+# select as needed
+#param_combos = [x for x in param_combos if not x.endswith('-sc1')]
+param_combos = [x for x in param_combos if x.endswith('-sc50')]
+print(param_combos)
+
 # rules for building params for sourmash sketching
 """
 build single parameter string for sourmash sketching
 """
-def build_param_str(moltype):
+def build_param_str(moltype, override_scaled=None):
     ksizes = sourmash_params[moltype]['ksize']
-    scaled = min(sourmash_params[moltype]['scaled'])
+    if override_scaled:
+        scaled = override_scaled
+    else:
+        scaled = min(sourmash_params[moltype]['scaled'])
     k_params = ",".join([f"k={k}" for k in ksizes])
     param_str = f"-p {moltype},{k_params},scaled={scaled},abund"
     return param_str
@@ -41,10 +51,10 @@ def build_param_str(moltype):
 """
 build multiple params for all sourmash sketching
 """
-def build_params(sourmash_params):
+def build_params(sourmash_params, override_scaled=None):
     param_str = []
     for moltype in sourmash_params.keys():
-        param_str.append(build_param_str(moltype))
+        param_str.append(build_param_str(moltype, override_scaled))
     return " ".join(param_str)
 
 
@@ -54,7 +64,7 @@ wildcard_constraints:
 
 rule all:
     input:
-        expand(os.path.join(out_dir, f"{basename}.sc{{scaled}}.zip"), scaled=[1,5,10]),
+        expand(os.path.join(out_dir, f"{basename}.sc{{scaled}}.zip"), scaled=[1000]), #10
         expand(os.path.join(out_dir, f"{basename}.{{params}}.rocksdb/CURRENT"), params=param_combos),
         os.path.join(out_dir, "blastn", f"{basename}.index.nhr"),
 
@@ -172,30 +182,31 @@ rule combine_sigs:
         sourmash sig cat {input.directsketch} {input.curated} -o {output.combined} 2> {log}
         """
 
-rule downsample_sigs:
-    input:
-        combined = os.path.join(out_dir, f"{basename}.sc1.zip"),
-    output:
-        downsampled = os.path.join(out_dir, f"{basename}.sc{{scaled}}.zip"),
-    threads: 1
-    resources:
-        mem_mb=3000,
-        disk_mb=5000,
-        runtime=60,
-        time=90,
-        partition="low2",
-    log: os.path.join(logs_dir, "downsample", f"{basename}.sc{{scaled}}.log")
-    benchmark: os.path.join(logs_dir, "downsample", f"{basename}.sc{{scaled}}.benchmark")
-    shell:
-        """
-        sourmash sig downsample {input.combined} -o {output} --scaled {wildcards.scaled} 2> {log}
-        """
+
+ rule downsample_sigs:
+     input:
+         combined = os.path.join(out_dir, f"{basename}.sc1.zip"),
+     output:
+         downsampled = os.path.join(out_dir, f"{basename}.sc{{scaled}}.zip"),
+     threads: 1
+     resources:
+         mem_mb=3000,
+         disk_mb=5000,
+         runtime=60,
+         time=90,
+         partition="low2",
+     log: os.path.join(logs_dir, "downsample", f"{basename}.sc{{scaled}}.log")
+     benchmark: os.path.join(logs_dir, "downsample", f"{basename}.sc{{scaled}}.benchmark")
+     shell:
+         """
+         sourmash sig downsample {input.combined} -o {output} --scaled {wildcards.scaled} 2> {log}
+         """
 
 rule index_rocksdb:
     input:
         os.path.join(out_dir, f"{basename}.sc{{scaled}}.zip"),
     output:
-        rocksdb_current = directory(os.path.join(out_dir, f"{basename}.{{moltype}}-k{{ksize}}-sc{{scaled}}.rocksdb/CURRENT")),
+        rocksdb_current = os.path.join(out_dir, f"{basename}.{{moltype}}-k{{ksize}}-sc{{scaled}}.rocksdb/CURRENT"),
     threads: 1
     resources:
         mem_mb=3000,
@@ -220,34 +231,26 @@ rule index_rocksdb:
 # get lengths of sequences in FASTA files + combine all into single FASTA file
 rule combine_fasta_and_save_length_info:
     input:
-        zipf = os.path.join(out_dir, f"{basename}.sc1.urlsketch.zip"), # use zip to make sure we have the fasta files
+        #zipf = os.path.join(out_dir, f"{basename}.sc1.urlsketch.zip"), # use zip to make sure we have the fasta files
         urlsketch_csv = os.path.join(out_dir, f"{basename}.urlsketch.csv"),
         gbsketch_csv = os.path.join(out_dir, f"{basename}.gbsketch.csv"),
     output: 
         combined= os.path.join(out_dir, f"{basename}.fna.gz"),
         lengths= os.path.join(out_dir, f"{basename}.lengths.csv"),
-    run:
-        import screed
-        # open urlsketch csv and find all fasta files
-        fastafiles = []
-        with open(input.urlsketch_csv) as csvfile:
-            reader = csv.DictReader(csvfile)
-            for row in reader:
-                fastafiles.append(os.path.join(CURATED_FASTA_DIR, row['download_filename']))
-        # open gbsketch csv and find all fasta files
-        with open(input.gbsketch_csv) as csvfile:
-            reader = csv.DictReader(csvfile)
-            for row in reader:
-                ident = row['name'].split(' ')[0]
-                fastafiles.append(os.path.join(ASSEMBLY_FASTA_DIR, ident + "_genomic.fna.gz"))
-        # open each fasta file and write lengths to output
-        for ff in fastafiles:
-            with screed.open(ff) as seqfile, open(output.lengths, 'w') as lens, gzip.open(output.combined, 'wt') as combined:
-                lens.write("filename,sequence_name,length\n")
-                for record in seqfile:
-                    bp = len(record.sequence)
-                    lens.write(f"{seqfile},{record.name},{bp}\n")
-                    combined.write(f">{record.name}\n{record.sequence}\n")
+    params:
+        curated_fasta_dir = CURATED_FASTA_DIR,
+        assembly_fasta_dir = ASSEMBLY_FASTA_DIR,
+    log: os.path.join(logs_dir, "combine-fasta", f"{basename}.log")
+    benchmark: os.path.join(logs_dir, "combine-fasta", f"{basename}.benchmark")
+    shell:
+        """
+        python combine-fasta.py --urlsketch-csv {input.urlsketch_csv} \
+                                --gbsketch-csv {input.gbsketch_csv} \
+                                --combined {output.combined} \
+                                --lengths {output.lengths} \
+                                --curated-fasta-dir {params.curated_fasta_dir} \
+                                --assembly-fasta-dir {params.assembly_fasta_dir} 2> {log}
+        """
 
 # # Rule to build BLAST index for the combined gzipped fasta file
 rule build_blast_nucl_index:
